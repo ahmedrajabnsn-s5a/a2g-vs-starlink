@@ -1,0 +1,89 @@
+/* SKYCOV: coverage figures + PPT kit shared by the coverage page and the cabin speed test.
+   Uses window.COVDATA, SKYGLOBE (globe snapshots) and PptxGenJS. */
+(function(){
+const D=window.COVDATA;
+// Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
+function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};
+  const useTw=a.tw&&a.tw.flights>=50; return useTw?{a:a.tw.a,s:a.tw.s,basis:'traffic-weighted (FR24, '+a.tw.flights+' flights)'}:{a:a.net.a,s:a.net.s,basis:'all '+a.net.routes+' routes, by distance'+(a.name==='Oman Air'?' (actual tracks)':'')}; }
+const pct=v=>Math.round(v)+'%';
+const TIE=3; // points: within this, coverage counts as level
+const WHY='A2G gives each aircraft a dedicated 108 Mbps site (no sharing), with better upload and lower latency';
+function rec(a){ const h=head(a), d=h.a-h.s;
+  if(d>TIE) return {pick:'A2G',kind:'coverage',short:'A2G · better coverage',text:`Recommend A2G: it covers ${Math.round(d)} points more of the flight time. ${WHY}.`};
+  if(d>=-TIE) return {pick:'A2G',kind:'tie',short:'A2G · coverage level, better speed',text:`Coverage is level (${pct(h.a)} vs ${pct(h.s)}), so recommend A2G: ${WHY}.`};
+  return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on today’s map. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
+const P={navy:'0B1B2E',ink:'0B1B2E',mute:'5B6B80',light:'F3F6FA',a2g:'1C8FD6',leo:'E07B24',line:'D5DEE8',white:'FFFFFF'};
+const today=()=>new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+function base(){ const p=new PptxGenJS(); p.layout='LAYOUT_WIDE'; p.author='SKYFive Arabia'; p.company='SKYFive Arabia'; p.theme={headFontFace:'Arial',bodyFontFace:'Calibri'};
+  p.defineSlideMaster({title:'DARK',background:{color:'030916'},slideNumber:{x:12.4,y:7.0,w:0.6,h:0.3,color:'8FA3BA',fontSize:10}});
+  p.defineSlideMaster({title:'LIGHT',background:{color:P.white},objects:[{text:{text:'SKYFive Arabia · A2G full plan ('+D.buffer_km+' km) vs Starlink · '+today(),options:{x:0.6,y:7.0,w:9,h:0.3,fontSize:10,color:P.mute}}}],slideNumber:{x:12.4,y:7.0,w:0.6,h:0.3,color:P.mute,fontSize:10}});
+  return p; }
+function title(s,t,sub){ s.addText(t,{x:0.6,y:0.35,w:12.1,h:0.75,fontSize:28,bold:true,color:P.ink,fontFace:'Arial',margin:0,valign:'top'});
+  if(sub) s.addText(sub,{x:0.6,y:1.1,w:12.1,h:0.4,fontSize:14,color:P.mute,margin:0}); }
+function cover(p,names,kicker,headTxt,sub){ const s=p.addSlide({masterName:'DARK'});
+  s.addImage({data:SKYGLOBE.snapshot(names,{w:1920,h:1422,legend:false}),x:3.2,y:0,w:10.133,h:7.5});
+  s.addShape(p.shapes.RECTANGLE,{x:0,y:0,w:6.4,h:7.5,fill:{color:'030916',transparency:8},line:{type:'none'}});
+  s.addText(kicker,{x:0.8,y:1.5,w:5.4,h:0.4,fontSize:14,bold:true,color:'4FB3F0',charSpacing:4,margin:0});
+  s.addText(headTxt,{x:0.8,y:2.0,w:5.4,h:2.4,fontSize:36,bold:true,color:'FFFFFF',fontFace:'Arial',margin:0,valign:'top'});
+  s.addText(sub,{x:0.8,y:4.5,w:5.2,h:1.4,fontSize:15,color:'C9D6E4',margin:0,valign:'top'});
+  s.addText('SKYFive Arabia · Commercial · '+today(),{x:0.8,y:6.4,w:5.4,h:0.4,fontSize:12,color:'8FA3BA',margin:0}); return s; }
+function summary(p,names){ const s=p.addSlide({masterName:'LIGHT'});
+  const rows=names.map(n=>{const a=D.airlines[n],h=head(a);return {n,a,h};});
+  const lead=rows.filter(r=>r.h.a>r.h.s).length;
+  const recs=rows.map(r=>rec(r.a)); const nA=recs.filter(x=>x.pick==='A2G').length;
+  title(s,nA===rows.length?'Recommend A2G for every airline selected':lead===rows.length?'The A2G full plan out-covers Starlink for every airline selected':lead+' of '+rows.length+' airlines are better covered by the A2G full plan','Share of flight time covered · A2G full plan with '+D.buffer_km+' km reach vs Starlink’s own availability map');
+  s.addChart(p.charts.BAR,[{name:'A2G full plan',labels:rows.map(r=>r.n),values:rows.map(r=>Math.round(r.h.a))},{name:'Starlink',labels:rows.map(r=>r.n),values:rows.map(r=>Math.round(r.h.s))}],
+    {x:0.6,y:1.6,w:7.2,h:5.2,barDir:'col',barGrouping:'clustered',chartColors:[P.a2g,P.leo],showValue:true,dataLabelPosition:'outEnd',dataLabelFormatCode:'0"%"',dataLabelFontSize:11,valAxisMaxVal:100,valAxisMinVal:0,valAxisLabelFormatCode:'0"%"',valAxisLabelFontSize:10,catAxisLabelFontSize:11,valGridLine:{color:'E3E9F0',size:0.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:11});
+  const hd=['Airline','A2G','Starlink','Recommend'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:P.navy},align:i&&i<3?'right':'left'}}));
+  s.addTable([hd,...rows.slice(0,10).map((r,i)=>[{text:r.n,options:{bold:true}},{text:pct(r.h.a),options:{align:'right',color:P.a2g,bold:r.h.a>=r.h.s}},{text:pct(r.h.s),options:{align:'right',color:P.leo,bold:r.h.s>r.h.a}},{text:recs[i].short,options:{fontSize:10,bold:true,color:recs[i].pick==='A2G'?P.a2g:P.leo}}])],
+    {x:8.1,y:1.7,w:4.6,colW:[1.3,0.75,0.85,1.7],fontSize:12,color:P.ink,rowH:0.38,border:{type:'solid',pt:0.5,color:P.line},margin:[0.03,0.07,0.03,0.07]});
+  s.addText('Rule: when coverage is within '+TIE+' points, recommend A2G, because '+WHY.charAt(0).toLowerCase()+WHY.slice(1)+'.',{x:8.1,y:6.05,w:4.6,h:0.8,fontSize:11,italic:true,color:P.mute,margin:0,valign:'top'});
+  return s; }
+function mapSlide(p,n,extra){ const a=D.airlines[n],h=head(a); const s=p.addSlide({masterName:'DARK'});
+  s.addImage({data:SKYGLOBE.snapshot([n],{w:1920,h:1500}),x:0,y:0,w:9.6,h:7.5});
+  s.addText(a.name,{x:9.85,y:0.5,w:3.2,h:0.6,fontSize:26,bold:true,color:'FFFFFF',fontFace:'Arial',margin:0});
+  s.addText(h.basis,{x:9.85,y:1.1,w:3.2,h:0.5,fontSize:11,color:'8FA3BA',margin:0,valign:'top'});
+  [['A2G full plan',h.a,'4FB3F0'],['Starlink',h.s,'F0923A']].forEach(([l,v,c],i)=>{ s.addText(pct(v),{x:9.85,y:1.7+i*1.2,w:3.2,h:0.75,fontSize:42,bold:true,color:c,fontFace:'Arial',margin:0}); s.addText(l,{x:9.85,y:2.42+i*1.2,w:3.2,h:0.3,fontSize:12,color:'C9D6E4',margin:0}); });
+  const other=a.tw&&a.tw.flights>=50?['All '+a.net.routes+' routes',a.net]:a.tw?['FR24 sample ('+a.tw.flights+' flights)',a.tw]:null;
+  if(other) s.addText([{text:other[0],options:{bold:true,color:'FFFFFF',breakLine:true}},{text:'A2G '+pct(other[1].a)+' · Starlink '+pct(other[1].s),options:{color:'C9D6E4'}}],{x:9.85,y:4.15,w:3.2,h:0.7,fontSize:12,margin:0});
+  s.addText([{text:'A2G misses: ',options:{bold:true,color:'4FB3F0'}},{text:a.gapsA.slice(0,3).map(g=>g[0]+' '+g[1]+'%').join(', ')||'nothing material',options:{color:'C9D6E4',breakLine:true}},
+    {text:'Starlink misses: ',options:{bold:true,color:'F0923A'}},{text:a.gapsS.slice(0,3).map(g=>g[0]+' '+g[1]+'%').join(', ')||'nothing material',options:{color:'C9D6E4'}}],{x:9.85,y:5.0,w:3.2,h:1.8,fontSize:12,margin:0,valign:'top',paraSpaceAfter:6});
+  const rc=rec(a); s.addText([{text:'Recommend '+rc.pick+': ',options:{bold:true,color:rc.pick==='A2G'?'4FB3F0':'F0923A'}},{text:rc.kind==='tie'?'coverage level, A2G faster':'better coverage',options:{color:'FFFFFF'}}],{x:9.85,y:6.6,w:3.2,h:0.4,fontSize:12,margin:0});
+  if(extra) extra(s); return s; }
+function compareSlide(p,n){ const a=D.airlines[n],h=head(a),rc=rec(a); const s=p.addSlide({masterName:'DARK'});
+  s.addText(a.name+': A2G full plan map vs Starlink map',{x:0.5,y:0.3,w:12.3,h:0.6,fontSize:24,bold:true,color:'FFFFFF',fontFace:'Arial',margin:0});
+  s.addText('Same routes, each network on its own · '+h.basis,{x:0.5,y:0.88,w:12.3,h:0.35,fontSize:12,color:'8FA3BA',margin:0});
+  [['a2g','A2G full plan',h.a,'4FB3F0'],['leo','Starlink',h.s,'F0923A']].forEach(([L,lab,v,c],i)=>{ const x=0.5+i*6.25;
+    s.addImage({data:SKYGLOBE.snapshot([n],{w:1600,h:1300,layer:L}),x,y:1.4,w:6.05,h:4.92});
+    s.addText([{text:pct(v)+'  ',options:{fontSize:30,bold:true,color:c}},{text:lab+' covers this share of flight time',options:{fontSize:13,color:'C9D6E4'}}],{x,y:6.38,w:6.05,h:0.55,margin:0,valign:'middle'}); });
+  s.addText([{text:'Recommend '+rc.pick+': ',options:{bold:true,color:rc.pick==='A2G'?'4FB3F0':'F0923A'}},{text:rc.kind==='tie'?'coverage level, A2G has the better upload and latency':'covers more of the flight time',options:{color:'FFFFFF'}}],{x:0.5,y:6.95,w:11.6,h:0.35,fontSize:12,margin:0});
+  return s; }
+function detailSlide(p,n){ const a=D.airlines[n],h=head(a); const s=p.addSlide({masterName:'LIGHT'});
+  const rc=rec(a); title(s,rc.kind==='tie'?`${a.name}: coverage level at ${pct(h.a)} vs ${pct(h.s)}, recommend A2G`:h.a>=h.s?`${a.name}: A2G full plan leads Starlink ${pct(h.a)} to ${pct(h.s)}`:`${a.name}: Starlink leads the A2G full plan ${pct(h.s)} to ${pct(h.a)}`,'Where each network misses, by markets and routes');
+  let y=1.7;
+  if(a.markets&&a.markets.length){ const hd=['Market','Traffic','A2G plan','Starlink'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:P.navy},align:i?'right':'left'}}));
+    s.addTable([hd,...a.markets.map(m=>[{text:m.label},{text:pct(m.share),options:{align:'right'}},{text:pct(m.a),options:{align:'right',color:P.a2g,bold:m.a>=m.s}},{text:pct(m.s),options:{align:'right',color:P.leo,bold:m.s>m.a}}])],{x:0.6,y,w:5.6,colW:[2.3,1.1,1.1,1.1],fontSize:12,color:P.ink,rowH:0.34,border:{type:'solid',pt:0.5,color:P.line},margin:[0.03,0.08,0.03,0.08]});
+    y+=0.34*(a.markets.length+1)+0.3; }
+  const top=[...a.routes].sort((x,y)=>(y.seats||0)-(x.seats||0)||y.km-x.km).slice(0,Math.max(4,Math.floor((6.7-y)/0.31)-1));
+  const h2=['Route','Km','A2G plan','Starlink'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:P.navy},align:i?'right':'left'}}));
+  s.addTable([h2,...top.map(r=>[{text:r.o+'–'+r.d},{text:r.km.toLocaleString('en-US'),options:{align:'right'}},{text:r.a+'%',options:{align:'right',color:P.a2g,bold:r.a>=r.s}},{text:r.s+'%',options:{align:'right',color:P.leo,bold:r.s>r.a}}])],{x:0.6,y,w:5.6,colW:[2.3,1.1,1.1,1.1],fontSize:11,color:P.ink,rowH:0.31,border:{type:'solid',pt:0.5,color:P.line},margin:[0.02,0.08,0.02,0.08]});
+  const gl=[...new Set([...a.gapsA.slice(0,5).map(g=>g[0]),...a.gapsS.slice(0,5).map(g=>g[0])])].slice(0,7), val=(arr,k)=>{const f=arr.find(g=>g[0]===k);return f?f[1]:0;};
+  if(gl.length) s.addChart(p.charts.BAR,[{name:'A2G full plan misses',labels:gl,values:gl.map(k=>val(a.gapsA,k))},{name:'Starlink misses',labels:gl,values:gl.map(k=>val(a.gapsS,k))}],
+    {x:6.6,y:1.6,w:6.1,h:3.6,barDir:'bar',barGrouping:'clustered',chartColors:[P.a2g,P.leo],showValue:true,dataLabelFormatCode:'0.0"%";;;',dataLabelFontSize:10,valAxisHidden:true,valGridLine:{style:'none'},catGridLine:{style:'none'},catAxisOrientation:'maxMin',catAxisLabelFontSize:11,showLegend:true,legendPos:'b',legendFontSize:11,showTitle:true,title:'Share of route distance each network misses',titleFontSize:12,titleColor:P.mute});
+  const ga=a.gapsA[0],gs=a.gapsS[0];
+  s.addText([{text:'Read: ',options:{bold:true}},{text:(ga?`A2G’s biggest gap is ${ga[0].toLowerCase()==='open sea'?'open sea':ga[0]} (${ga[1]}% of route distance). `:'')+(gs?`Starlink’s is ${gs[0]} (${gs[1]}%), which is not Available on its map today.`:'')}],{x:6.6,y:5.35,w:6.1,h:0.8,fontSize:13,color:P.ink,margin:0,valign:'top'});
+  s.addText([{text:'Recommendation: ',options:{bold:true,color:rc.pick==='A2G'?P.a2g:P.leo}},{text:rc.text}],{x:6.6,y:6.1,w:6.1,h:0.8,fontSize:12,color:P.ink,margin:0,valign:'top'});
+  return s; }
+function methodSlide(p,extra){ const s=p.addSlide({masterName:'LIGHT'}); title(s,'Method and sources');
+  const items=['A2G full plan: a stretch of route is covered when it is over, or within '+D.buffer_km+' km of, a country in the SKYFive A2G plan (KSA, Europe, India, Oman, Turkey, Egypt, UAE, Qatar, Jordan, Iraq and the planned African and Asian markets).',
+    'Starlink: a stretch is covered when it is over a country marked Available on starlink.com/map (feed read 3 Nov 2026) or over open sea. Pending regulatory, coming soon and unknown count as not covered. This is Starlink’s best case: airlines also need each overflown state’s authorisation.',
+    'Routes: Oman Air uses the attached FR24 track file (44 actual flights from Muscat; the COK track ended at Hyderabad and was left out). Other airlines use the routes in the SKYFive A2G Coverage Globe. Traffic weights come from its FR24 sample, 21 Sep – 6 Oct 2026.'].concat(extra||[]);
+  s.addText(items.map((t,i)=>({text:t,options:{bullet:true,breakLine:i<items.length-1}})),{x:0.6,y:1.4,w:12.1,h:5.3,fontSize:15,color:P.ink,margin:0,valign:'top',paraSpaceAfter:12}); return s; }
+async function getDL(){ for(let i=0;i<8&&!(window.claude&&window.claude.use);i++) await new Promise(r=>setTimeout(r,250));
+  try{ return window.claude&&window.claude.use ? await window.claude.use('downloads') : null; }catch(e){ return null; } }
+async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName:filename}); return {status:'saved'}; }
+  const dl=await getDL();
+  if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
+  const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
+window.SKYCOV={head,rec,TIE,pct,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
+})();

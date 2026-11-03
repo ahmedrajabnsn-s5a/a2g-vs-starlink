@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cabin Speed Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cabin Wi-Fi portal. Two live gauges side by side (A2G vs LEO), network picture under them, then the averages table and the assumptions. Single dark look by design. */
+:root{
+  --bg:#06101f; --panel:#0c1b31; --panel-2:#11243f; --line:#1f3758; --ink:#e9f2fb; --mute:#8ea6c2;
+  --a2g:#3fd8ff; --leo:#ff9d45; --good:#4fd6a0; --warn:#ffcf5c;
+  --f-display:"Chakra Petch","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:20px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.02em}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.05}
+h2{font-size:20px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top p{margin:6px 0 0;color:var(--mute);max-width:62ch}
+.eyebrow{font-family:var(--f-display);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--a2g)}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+select,button{font:inherit;color:var(--ink)}
+select{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+label.sel{display:grid;gap:4px;font-size:12px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase}
+.run{font-family:var(--f-display);font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:15px;padding:14px 26px;border-radius:999px;border:1px solid #7fe7ff;cursor:pointer;
+  background:linear-gradient(90deg,rgba(63,216,255,.22),rgba(255,157,69,.22));box-shadow:0 0 24px rgba(63,216,255,.18)}
+.run:hover{filter:brightness(1.15)} .run:disabled{opacity:.55;cursor:wait}
+:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:820px){.duo{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;min-width:0}
+.gcard{display:grid;gap:14px;position:relative;overflow:hidden}
+.gcard.a2g{--c:var(--a2g)} .gcard.leo{--c:var(--leo)}
+.gh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.gh h3{font-size:24px;color:var(--c)}
+.gh small{color:var(--mute)}
+.phase{font-family:var(--f-display);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--c);padding:4px 10px;border:1px solid var(--c);border-radius:999px}
+canvas.g{width:100%;max-width:420px;aspect-ratio:1.45/1;justify-self:center;display:block}
+.reads{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.reads div{background:var(--panel-2);border-radius:12px;padding:10px 12px}
+.reads b{display:block;font-family:var(--f-display);font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.reads small{font-size:11.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+.note{font-size:13px;color:var(--mute)}
+.net{display:grid;gap:10px}
+canvas.net{width:100%;height:220px;display:block;border-radius:12px;background:#081529}
+.results table{width:100%;border-collapse:collapse;font-size:14px}
+.tblw{overflow-x:auto}
+.results th,.results td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.results th:first-child,.results td:first-child{text-align:left}
+.results th{font-family:var(--f-display);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.results td.a{color:var(--a2g);font-weight:600} .results td.l{color:var(--leo);font-weight:600}
+.win{font-size:11px;font-family:var(--f-display);letter-spacing:.1em;padding:2px 7px;border-radius:999px;background:rgba(79,214,160,.15);color:var(--good);margin-left:6px}
+.assume{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:820px){.assume{grid-template-columns:1fr}}
+.sl{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.sl label{font-size:14px}
+.sl output{font-family:var(--f-mono);font-size:14px;color:var(--ink)}
+.sl input{grid-column:1/-1;width:100%;accent-color:var(--c,var(--a2g))}
+.sl small{grid-column:1/-1;color:var(--mute);font-size:12px}
+.hist{display:flex;flex-wrap:wrap;gap:8px}
+.hist span{font-family:var(--f-mono);font-size:12px;background:var(--panel-2);border-radius:8px;padding:4px 8px;color:var(--mute)}
+.src{font-size:12.5px;color:var(--mute)} .src a{color:#9fdcff}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:620px){.big,.reads{grid-template-columns:1fr 1fr}}
+.big div{background:var(--panel-2);border-radius:14px;padding:14px}
+.big b{font-family:var(--f-display);font-size:30px;display:block;line-height:1.1}
+.big small{color:var(--mute);font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>html,body{margin:0}body{min-height:100vh}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">SKYFive · in-flight connectivity</div>
+      <h1>Cabin Speed Test: A2G vs Starlink LEO</h1>
+      <p>One aircraft per A2G site always gets the full site, 108 Mbps. A Starlink beam covers a much wider area, so aircraft from many airlines share it. Run the test to see what one aircraft gets on each network.</p>
+    </div>
+    <div class="controls">
+      <label class="sel" for="airline">Airline (coverage)<select id="airline"></select></label>
+      <label class="sel" for="preset">Traffic in the LEO beam<select id="preset">
+        <option value="3">Quiet sector · 3 aircraft</option>
+        <option value="8" selected>Typical Gulf airway · 8 aircraft</option>
+        <option value="20">Busy hub area · 20 aircraft</option>
+        <option value="35">Peak corridor · 35 aircraft</option>
+      </select></label>
+      <button class="run" id="run" type="button">Run speed test</button>
+      <button class="run" id="ppt" type="button" style="border-color:#ffb877">Export PPT</button>
+      <a class="run" id="toCov" href="index.html" style="text-decoration:none;border-color:#9aa9ff">← Coverage map</a>
+    </div>
+  </header>
+
+  <div class="note" id="msg" role="status" style="min-height:1.2em"></div>
+  <section class="duo">
+    <article class="card gcard a2g" aria-live="polite">
+      <div class="gh"><h3>SKYFive A2G</h3><span class="phase" id="pa">Ready</span></div>
+      <small class="note">Ground sites 120 km apart · 1 aircraft per site · site capacity is not shared</small>
+      <canvas class="g" id="ga" width="840" height="580" aria-label="A2G speed gauge"></canvas>
+      <div class="reads"><div><small>Latency</small><b id="aP">–</b></div><div><small>Download</small><b id="aD">–</b></div><div><small>Upload</small><b id="aU">–</b></div></div>
+    </article>
+    <article class="card gcard leo" aria-live="polite">
+      <div class="gh"><h3>Starlink LEO</h3><span class="phase" id="pl">Ready</span></div>
+      <small class="note">One wide beam · <span id="nLab">8</span> aircraft from several airlines share it</small>
+      <canvas class="g" id="gl" width="840" height="580" aria-label="Starlink speed gauge"></canvas>
+      <div class="reads"><div><small>Latency</small><b id="lP">–</b></div><div><small>Download</small><b id="lD">–</b></div><div><small>Upload</small><b id="lU">–</b></div></div>
+    </article>
+  </section>
+
+  <section class="card net">
+    <h2>Who shares the capacity</h2>
+    <canvas class="net" id="net" width="2400" height="440" aria-label="Left: A2G cells with one aircraft each. Right: one Starlink beam shared by many aircraft."></canvas>
+    <div class="hist" id="hist"><span>No runs yet. Each run draws a new traffic level for the LEO beam.</span></div>
+  </section>
+
+  <section class="card results">
+    <h2>Average per aircraft</h2>
+    <div class="big" id="bigs"></div>
+    <div class="tblw"><table id="tbl"></table></div>
+    <p class="note" id="covNote"></p>
+  </section>
+
+  <section class="card">
+    <h2>Assumptions</h2>
+    <div class="assume">
+      <div style="--c:var(--a2g)">
+        <h3 style="color:var(--a2g);font-size:18px;margin-bottom:4px">SKYFive A2G</h3>
+        <div class="sl"><label for="aDL">Site download capacity</label><output id="oaDL"></output><input type="range" id="aDL" min="40" max="200" step="1" value="108"><small>Your figure: 108 Mbps per site, all of it to the one aircraft on that site.</small></div>
+        <div class="sl"><label for="aUL">Site upload capacity</label><output id="oaUL"></output><input type="range" id="aUL" min="5" max="80" step="1" value="36"><small>Assumed at one third of download (typical LTE ratio). Replace with your measured figure.</small></div>
+        <div class="sl"><label for="aLat">Latency</label><output id="oaLat"></output><input type="range" id="aLat" min="15" max="80" step="1" value="30"><small>Terrestrial path: aircraft → site → core. Assumed 30 ms.</small></div>
+      </div>
+      <div style="--c:var(--leo)">
+        <h3 style="color:var(--leo);font-size:18px;margin-bottom:4px">Starlink LEO</h3>
+        <div class="sl"><label for="bDL">Beam download capacity for aircraft</label><output id="obDL"></output><input type="range" id="bDL" min="300" max="4000" step="50" value="1200"><small>Assumed. With 8 aircraft it gives about 150 Mbps each, close to Ookla’s measured Starlink in-flight median (152 Mbps).</small></div>
+        <div class="sl"><label for="bUL">Beam upload capacity for aircraft</label><output id="obUL"></output><input type="range" id="bUL" min="50" max="800" step="10" value="200"><small>Assumed; 8 aircraft gives about 25 Mbps each (Ookla median 24 Mbps).</small></div>
+        <div class="sl"><label for="cDL">Max per aircraft (terminals)</label><output id="ocDL"></output><input type="range" id="cDL" min="100" max="500" step="10" value="350"><small>Advertised up to 350 Mbps per aircraft (airBaltic). Upload capped at 40 Mbps.</small></div>
+        <div class="sl"><label for="lLat">Latency</label><output id="olLat"></output><input type="range" id="lLat" min="25" max="120" step="1" value="44"><small>Ookla Q1 2025 Starlink in-flight median: 44 ms.</small></div>
+        <div class="sl"><label for="nAC">Average aircraft in the beam</label><output id="onAC"></output><input type="range" id="nAC" min="1" max="50" step="1" value="8"><small>Varies run to run (Poisson); the average below uses 4,000 draws.</small></div>
+      </div>
+    </div>
+    <div class="sl" style="--c:var(--good);border:0"><label for="users">Active passengers on board</label><output id="ousers"></output><input type="range" id="users" min="5" max="150" step="1" value="45"><small>About 25% of a 180-seat cabin online at once. Used for the per-passenger column.</small></div>
+    <p class="src">Sources: <a href="https://arxiv.org/html/2508.09839v1" target="_blank" rel="noopener">A First Look at Starlink In-Flight Performance (2025)</a> · Ookla Q1 2025 in-flight medians cited there · <a href="https://www.notebookcheck.net/Planes-with-Starlink-offer-fastest-Internet-as-two-airlines-take-in-flight-Wi-Fi-speeds-lead.1052972.0.html" target="_blank" rel="noopener">Notebookcheck on Ookla airline results</a>. Coverage: SKYFive A2G full plan with 150 km reach vs starlink.com/map (3 Nov 2026); Oman Air from its actual flight tracks.</p>
+  </section>
+</div>
+
+<script src="lib/three-r147/build/three.min.js"></script>
+<script src="lib/three-r147/examples/js/shaders/CopyShader.js"></script>
+<script src="lib/three-r147/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="lib/three-r147/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="lib/three-r147/examples/js/postprocessing/MaskPass.js"></script>
+<script src="lib/three-r147/examples/js/postprocessing/RenderPass.js"></script>
+<script src="lib/three-r147/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="lib/three-r147/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="lib/three-r147/examples/js/lines/LineSegmentsGeometry.js"></script>
+<script src="lib/three-r147/examples/js/lines/LineGeometry.js"></script>
+<script src="lib/three-r147/examples/js/lines/LineMaterial.js"></script>
+<script src="lib/three-r147/examples/js/lines/LineSegments2.js"></script>
+<script src="lib/three-r147/examples/js/lines/Line2.js"></script>
+<script src="lib/d3.min.js"></script>
+<script src="lib/topojson-client.min.js"></script>
+<script src="lib/pptxgen.bundle.js"></script>
+<script src="data/countries-50m.js"></script>
+<script src="covdata.js"></script>
+<script src="flat.js"></script>
+<script src="globe.js"></script>
+<script src="covmap.js"></script>
+<script>
+(function(){
+const CD=window.COVDATA;const COV={}; // share of flight time covered: A2G full plan (150 km) vs Starlink map, same basis as the coverage page
+['Oman Air','SalamAir',...CD.order.filter(n=>n!=='Oman Air'&&n!=='SalamAir')].forEach(n=>{const h=SKYCOV.head(CD.airlines[n]);COV[n]={a:Math.round(h.a),l:Math.round(h.s),basis:h.basis};});
+const $=id=>document.getElementById(id);
+const sel=$('airline'); Object.keys(COV).forEach(k=>sel.add(new Option(k,k)));
+const slug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+function fromHash(){ const h=(location.hash||'').slice(1); const n=Object.keys(COV).find(k=>slug(k)===h); if(n){ sel.value=n; } }
+fromHash();
+const P={}; const ids=['aDL','aUL','aLat','bDL','bUL','cDL','lLat','nAC','users'];
+const fmt={aDL:v=>v+' Mbps',aUL:v=>v+' Mbps',aLat:v=>v+' ms',bDL:v=>v.toLocaleString('en-US')+' Mbps',bUL:v=>v+' Mbps',cDL:v=>v+' Mbps',lLat:v=>v+' ms',nAC:v=>v+' aircraft',users:v=>v+' users'};
+function read(){ids.forEach(i=>{P[i]=+$(i).value;$('o'+i).textContent=fmt[i](P[i]);});$('nLab').textContent=P.nAC;}
+const UL_CAP=40;
+// Poisson draw, at least 1 aircraft (ours)
+function pois(m){let L=Math.exp(-m),k=0,p=1;if(m>30){return Math.max(1,Math.round(m+Math.sqrt(m)*gauss()));}do{k++;p*=Math.random();}while(p>L);return Math.max(1,k-1);}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function leoFor(n){return {dl:Math.min(P.cDL,P.bDL/n),ul:Math.min(UL_CAP,P.bUL/n),lat:P.lLat*(1+0.015*Math.max(0,n-8))};}
+function averages(){
+  let dl=0,ul=0,lat=0,N=4000;for(let i=0;i<N;i++){const r=leoFor(pois(P.nAC));dl+=r.dl;ul+=r.ul;lat+=r.lat;}
+  return {a:{dl:P.aDL,ul:P.aUL,lat:P.aLat},l:{dl:dl/N,ul:ul/N,lat:lat/N}};
+}
+// ---------- gauge
+const TICKS=[0,10,25,50,100,150,250,400];
+function pos(v){v=Math.max(0,Math.min(400,v));return Math.sqrt(v/400);}
+function gauge(cv,val,col,label,unit){
+  const c=cv.getContext('2d'),W=cv.width,H=cv.height,cx=W/2,cy=H*0.78,R=Math.min(W*0.42,H*0.7);
+  c.clearRect(0,0,W,H);const a0=Math.PI*0.85,a1=Math.PI*2.15;
+  c.lineCap='round';c.lineWidth=34;c.strokeStyle='#14294a';c.beginPath();c.arc(cx,cy,R,a0,a1);c.stroke();
+  const f=pos(val);if(f>0){const g=c.createLinearGradient(cx-R,0,cx+R,0);g.addColorStop(0,col+'55');g.addColorStop(1,col);c.strokeStyle=g;c.shadowColor=col;c.shadowBlur=26;c.beginPath();c.arc(cx,cy,R,a0,a0+(a1-a0)*f);c.stroke();c.shadowBlur=0;}
+  c.fillStyle='#8ea6c2';c.font='500 26px "IBM Plex Mono", monospace';c.textAlign='center';c.textBaseline='middle';
+  TICKS.forEach(t=>{const a=a0+(a1-a0)*pos(t);c.fillText(t,cx+Math.cos(a)*(R-66),cy+Math.sin(a)*(R-66));});
+  const a=a0+(a1-a0)*f;c.strokeStyle='#e9f2fb';c.lineWidth=6;c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.cos(a)*(R-30),cy+Math.sin(a)*(R-30));c.stroke();
+  c.fillStyle=col;c.beginPath();c.arc(cx,cy,14,0,7);c.fill();
+  c.fillStyle='#e9f2fb';c.font='700 92px "Chakra Petch", sans-serif';c.fillText(val>0?(val<10?val.toFixed(1):Math.round(val)):'0',cx,cy-118);
+  c.fillStyle='#8ea6c2';c.font='600 26px "Chakra Petch", sans-serif';c.fillText((label||'')+' · '+(unit||'Mbps'),cx,cy-50);
+}
+// ---------- network picture
+const AIRL=['#3fd8ff','#ff9d45','#c8a5ff','#4fd6a0','#ffcf5c','#ff6f8a','#7aa7ff'];
+let planes=[],t0=performance.now(),curN=8;
+function seed(n){curN=n;planes=Array.from({length:n},(_,i)=>({r:Math.sqrt(Math.random())*0.92,a:Math.random()*6.283,s:(Math.random()*.4+.2)*(Math.random()<.5?-1:1),c:AIRL[i%AIRL.length]}));}
+function plane(c,x,y,ang,col,sz){c.save();c.translate(x,y);c.rotate(ang);c.fillStyle=col;c.beginPath();c.moveTo(sz,0);c.lineTo(-sz*.6,sz*.55);c.lineTo(-sz*.3,0);c.lineTo(-sz*.6,-sz*.55);c.closePath();c.fill();c.restore();}
+function drawNet(now){
+  const cv=$('net'),c=cv.getContext('2d'),W=cv.width,H=cv.height,t=(now-t0)/1000;c.clearRect(0,0,W,H);
+  c.font='600 30px "Chakra Petch", sans-serif';c.textAlign='left';c.textBaseline='top';
+  c.fillStyle='#3fd8ff';c.fillText('A2G · 1 aircraft per site · '+P.aDL+' Mbps each',40,24);
+  const hs=92,ox=120,oy=230;
+  for(let i=0;i<6;i++){const x=ox+i*hs*1.55,y=oy+(i%2?50:-30);
+    c.strokeStyle='rgba(63,216,255,.55)';c.lineWidth=3;c.beginPath();for(let k=0;k<6;k++){const a=Math.PI/3*k;c[k?'lineTo':'moveTo'](x+Math.cos(a)*hs,y+Math.sin(a)*hs);}c.closePath();c.stroke();
+    c.fillStyle='rgba(63,216,255,.07)';c.fill();
+    c.fillStyle='#8ea6c2';c.fillRect(x-4,y+30,8,40);
+    const px=x+Math.sin(t*.8+i)*30;plane(c,px,y-10,0,'#e9f2fb',26);}
+  // LEO beam
+  const bx=W*0.73,by=H*0.56,br=H*0.4;
+  c.fillStyle='#ff9d45';c.textAlign='left';c.fillText('Starlink · one beam · '+curN+' aircraft share '+P.bDL.toLocaleString('en-US')+' Mbps',W*0.5,24);
+  const g=c.createRadialGradient(bx,by,10,bx,by,br);g.addColorStop(0,'rgba(255,157,69,.28)');g.addColorStop(1,'rgba(255,157,69,.04)');
+  c.fillStyle=g;c.beginPath();c.arc(bx,by,br,0,7);c.fill();c.strokeStyle='rgba(255,157,69,.6)';c.setLineDash([10,10]);c.lineWidth=3;c.stroke();c.setLineDash([]);
+  planes.forEach(p=>{const a=p.a+t*p.s*.15,x=bx+Math.cos(a)*p.r*br*1.6,y=by+Math.sin(a)*p.r*br*.95;plane(c,x,y,a+(p.s>0?Math.PI/2:-Math.PI/2),p.c,20);});
+  c.fillStyle='#8ea6c2';c.font='500 24px "IBM Plex Mono", monospace';c.textAlign='center';
+  const sh=leoFor(curN);c.fillText('≈ '+Math.round(sh.dl)+' Mbps down per aircraft',bx,by+br+14);
+  if(!REDUCE) requestAnimationFrame(drawNet);
+}
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ---------- results
+function results(){
+  const av=averages(),cov=COV[sel.value],u=P.users;
+  const rows=[
+    ['Download per aircraft',av.a.dl,av.l.dl,'Mbps',1],
+    ['Upload per aircraft',av.a.ul,av.l.ul,'Mbps',1],
+    ['Latency',av.a.lat,av.l.lat,'ms',-1],
+    ['Download per passenger',av.a.dl/u,av.l.dl/u,'Mbps',1],
+    ['Download averaged over the flight',av.a.dl*cov.a/100,av.l.dl*cov.l/100,'Mbps',1],
+    ['Upload averaged over the flight',av.a.ul*cov.a/100,av.l.ul*cov.l/100,'Mbps',1],
+  ];
+  const f=(v,u)=>(v<10&&u!=='ms'?v.toFixed(1):Math.round(v))+' '+u;
+  $('tbl').innerHTML='<tr><th>Per aircraft</th><th>SKYFive A2G</th><th>Starlink LEO</th></tr>'+rows.map(r=>{const aw=r[4]>0?r[1]>=r[2]:r[1]<=r[2];
+    return `<tr><td>${r[0]}</td><td class="a">${f(r[1],r[3])}${aw?'<span class="win">better</span>':''}</td><td class="l">${f(r[2],r[3])}${!aw?'<span class="win">better</span>':''}</td></tr>`;}).join('');
+  $('bigs').innerHTML=`<div><small>Average download per aircraft</small><b><span style="color:var(--a2g)">${Math.round(av.a.dl)}</span> vs <span style="color:var(--leo)">${Math.round(av.l.dl)}</span></b><small>Mbps · A2G vs Starlink</small></div>
+   <div><small>Average upload per aircraft</small><b><span style="color:var(--a2g)">${Math.round(av.a.ul)}</span> vs <span style="color:var(--leo)">${Math.round(av.l.ul)}</span></b><small>Mbps · A2G vs Starlink</small></div>
+   <div><small>Average latency</small><b><span style="color:var(--a2g)">${Math.round(av.a.lat)}</span> vs <span style="color:var(--leo)">${Math.round(av.l.lat)}</span></b><small>ms · lower is better</small></div>`;
+  $('covNote').textContent=`Flight averages use ${sel.value}’s coverage: A2G full plan ${cov.a}% vs Starlink ${cov.l}% of flight time. Coverage basis: ${cov.basis}; A2G reach 150 km. Outside coverage the aircraft gets 0 Mbps. Starlink latency rises 1.5% per aircraft above 8 in the beam (assumed queueing).`;
+}
+// ---------- speed test run
+const hist=[];
+function animate(cv,col,pEl,rd,target,done){
+  const steps=[['Latency',1600],['Download',3800],['Upload',3200]];let i=0;
+  function phase(){if(i>=steps.length){pEl.textContent='Done';done&&done();return;}
+    const [nm,dur]=steps[i];pEl.textContent=nm;const st=performance.now();
+    const goal=nm==='Download'?target.dl:nm==='Upload'?target.ul:target.lat;
+    (function tick(now){const k=Math.min(1,(now-st)/dur);const ease=1-Math.pow(1-k,3);
+      const jit=1+(Math.random()-.5)*0.08*(1-k*0.6);let v=goal*ease*jit;
+      if(nm==='Latency'){v=goal*(1+(1-ease)*0.8)*jit;rd[0].textContent=Math.round(v)+' ms';gauge(cv,0,col,'Ping',Math.round(v)+' ms');}
+      else{(nm==='Download'?rd[1]:rd[2]).textContent=(v<10?v.toFixed(1):Math.round(v))+' Mbps';gauge(cv,v,col,nm);}
+      if(k<1)requestAnimationFrame(tick);else{if(nm==='Latency')rd[0].textContent=Math.round(goal)+' ms';else (nm==='Download'?rd[1]:rd[2]).textContent=(goal<10?goal.toFixed(1):Math.round(goal))+' Mbps';i++;phase();}})(st);}
+  phase();
+}
+$('run').addEventListener('click',()=>{
+  read();const n=pois(P.nAC);seed(n);if(REDUCE)drawNet(performance.now());
+  const A={dl:P.aDL*(0.97+Math.random()*0.03),ul:P.aUL*(0.96+Math.random()*0.04),lat:P.aLat*(0.95+Math.random()*0.1)};
+  const L=leoFor(n);L.dl*=0.95+Math.random()*0.05;L.ul*=0.94+Math.random()*0.06;L.lat*=0.93+Math.random()*0.14;
+  $('run').disabled=true;let left=2;const fin=()=>{if(--left)return;$('run').disabled=false;
+    hist.unshift(`Run ${hist.length+1}: ${n} aircraft in beam · A2G ${Math.round(A.dl)}/${Math.round(A.ul)} Mbps · Starlink ${Math.round(L.dl)}/${Math.round(L.ul)} Mbps`);
+    $('hist').innerHTML=hist.slice(0,6).map(h=>`<span>${h}</span>`).join('');};
+  animate($('ga'),'#3fd8ff',$('pa'),[$('aP'),$('aD'),$('aU')],A,fin);
+  animate($('gl'),'#ff9d45',$('pl'),[$('lP'),$('lD'),$('lU')],L,fin);
+});
+function refresh(){read();results();if(!planes.length||Math.abs(planes.length-P.nAC)>0)seed(P.nAC);if(REDUCE)drawNet(performance.now());}
+ids.forEach(i=>$(i).addEventListener('input',refresh));
+sel.addEventListener('change',results);
+addEventListener('hashchange',()=>{fromHash();results();});
+$('preset').addEventListener('change',e=>{$('nAC').value=e.target.value;refresh();});
+read();seed(P.nAC);results();
+gauge($('ga'),P.aDL,'#3fd8ff','Download');gauge($('gl'),leoFor(P.nAC).dl,'#ff9d45','Download');
+$('aP').textContent=P.aLat+' ms';$('aD').textContent=P.aDL+' Mbps';$('aU').textContent=P.aUL+' Mbps';
+const l0=leoFor(P.nAC);$('lP').textContent=Math.round(l0.lat)+' ms';$('lD').textContent=Math.round(l0.dl)+' Mbps';$('lU').textContent=Math.round(l0.ul)+' Mbps';
+$('pa').textContent='Expected';$('pl').textContent='Expected';
+document.fonts&&document.fonts.ready.then(()=>{gauge($('ga'),P.aDL,'#3fd8ff','Download');gauge($('gl'),l0.dl,'#ff9d45','Download');});
+requestAnimationFrame(drawNet);
+// ---------- PPT export
+// Export button stays visible; save() waits for the viewer and explains if downloads are blocked here.
+function avgAt(n){const keep=P.nAC;P.nAC=n;const r=averages();P.nAC=keep;return r;}
+$('ppt').addEventListener('click',async()=>{
+  const b=$('ppt');b.disabled=true;$('msg').textContent='Building the deck…';
+  try{read();const T=SKYCOV.ppt,p=T.base(),av=averages(),r0=v=>v<10?v.toFixed(1):String(Math.round(v));
+    T.cover(p,['Oman Air','SalamAir'],'CABIN SPEED TEST','A2G vs Starlink LEO: what one aircraft gets','A2G gives each aircraft its own 108 Mbps site. A Starlink beam is shared by every aircraft flying under it. Focus: Oman Air and SalamAir.');
+    // averages
+    let s=p.addSlide({masterName:'LIGHT'});T.title(s,'Average per aircraft at '+P.nAC+' aircraft in the Starlink beam','Download and upload per aircraft, latency per session · Starlink averaged over 4,000 traffic draws');
+    [['Download',av.a.dl,av.l.dl,'Mbps'],['Upload',av.a.ul,av.l.ul,'Mbps'],['Latency',av.a.lat,av.l.lat,'ms']].forEach(([l,a,lv,u],i)=>{const x=0.6+i*4.13;
+      s.addShape(p.shapes.ROUNDED_RECTANGLE,{x,y:1.7,w:3.85,h:2.6,fill:{color:'F3F6FA'},line:{color:'F3F6FA'},rectRadius:0.12});
+      s.addText(l+' ('+u+')',{x:x+0.3,y:1.85,w:3.3,h:0.4,fontSize:16,bold:true,color:T.P.ink,margin:0});
+      s.addText([{text:r0(a),options:{color:T.P.a2g}},{text:'  vs  ',options:{color:T.P.mute,fontSize:18}},{text:r0(lv),options:{color:T.P.leo}}],{x:x+0.3,y:2.4,w:3.4,h:1.0,fontSize:44,bold:true,margin:0,valign:'middle'});
+      const better=u==='ms'?(a<=lv?'A2G':'Starlink'):(a>=lv?'A2G':'Starlink');
+      s.addText('A2G vs Starlink · better: '+better,{x:x+0.3,y:3.6,w:3.3,h:0.4,fontSize:12,color:T.P.mute,margin:0});});
+    const hd=['Per aircraft','SKYFive A2G','Starlink LEO'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:T.P.navy},align:i?'right':'left'}}));
+    const rows=[['Download per passenger ('+P.users+' online)',av.a.dl/P.users,av.l.dl/P.users,'Mbps'],['Download averaged over an Oman Air flight',av.a.dl*COV['Oman Air'].a/100,av.l.dl*COV['Oman Air'].l/100,'Mbps'],['Download averaged over a SalamAir flight',av.a.dl*COV['SalamAir'].a/100,av.l.dl*COV['SalamAir'].l/100,'Mbps']];
+    s.addTable([hd,...rows.map(r=>[{text:r[0]},{text:r0(r[1])+' '+r[3],options:{align:'right',color:T.P.a2g,bold:r[1]>=r[2]}},{text:r0(r[2])+' '+r[3],options:{align:'right',color:T.P.leo,bold:r[2]>r[1]}}])],{x:0.6,y:4.6,w:12.1,colW:[6.1,3,3],fontSize:14,color:T.P.ink,rowH:0.42,border:{type:'solid',pt:0.5,color:T.P.line},margin:[0.04,0.1,0.04,0.1]});
+    // scenarios
+    const sc=[3,8,20,35].map(n=>({n,r:avgAt(n)}));s=p.addSlide({masterName:'LIGHT'});
+    const cross=(()=>{for(let n=1;n<=60;n++){if(avgAt(n).l.dl<P.aDL)return n;}return null;})();
+    T.title(s,cross?'Starlink falls below A2G once about '+cross+' aircraft share a beam':'Download per aircraft by traffic in the Starlink beam','A2G stays at '+P.aDL+' Mbps: one aircraft per site, never shared');
+    s.addChart(p.charts.BAR,[{name:'SKYFive A2G',labels:sc.map(x=>x.n+' aircraft'),values:sc.map(x=>Math.round(x.r.a.dl))},{name:'Starlink LEO',labels:sc.map(x=>x.n+' aircraft'),values:sc.map(x=>Math.round(x.r.l.dl))}],
+      {x:0.6,y:1.6,w:7.4,h:5.1,barDir:'col',barGrouping:'clustered',chartColors:[T.P.a2g,T.P.leo],showValue:true,dataLabelPosition:'outEnd',dataLabelFontSize:11,valAxisLabelFontSize:11,catAxisLabelFontSize:12,valGridLine:{color:'E3E9F0',size:0.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',showTitle:true,title:'Average download per aircraft (Mbps)',titleFontSize:12,titleColor:T.P.mute});
+    const h2=['Aircraft in beam','Starlink UL','Starlink latency'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:T.P.navy},align:i?'right':'left'}}));
+    s.addTable([h2,...sc.map(x=>[{text:String(x.n)},{text:r0(x.r.l.ul)+' Mbps',options:{align:'right'}},{text:Math.round(x.r.l.lat)+' ms',options:{align:'right'}}]),[{text:'A2G (any traffic)',options:{bold:true,color:T.P.a2g}},{text:P.aUL+' Mbps',options:{align:'right',color:T.P.a2g,bold:true}},{text:P.aLat+' ms',options:{align:'right',color:T.P.a2g,bold:true}}]],
+      {x:8.4,y:1.8,w:4.3,colW:[1.9,1.2,1.2],fontSize:13,color:T.P.ink,rowH:0.42,border:{type:'solid',pt:0.5,color:T.P.line},margin:[0.04,0.08,0.04,0.08]});
+    s.addText('A2G wins upload and latency at every traffic level. Starlink’s download is higher only in quiet airspace.',{x:8.4,y:4.7,w:4.3,h:1.4,fontSize:14,color:T.P.ink,margin:0,valign:'top'});
+    // maps for the focus airlines
+    for(const k of ['Oman Air','SalamAir'])T.mapSlide(p,k,sl=>{sl.addText('Avg download over the flight: A2G '+r0(av.a.dl*COV[k].a/100)+' vs Starlink '+r0(av.l.dl*COV[k].l/100)+' Mbps',{x:0.4,y:0.3,w:8.8,h:0.45,fontSize:14,bold:true,color:'FFFFFF',fill:{color:'0B1B2E',transparency:25},margin:[0.05,0.12,0.05,0.12]});});
+    T.methodSlide(p,['Speed model: A2G site '+P.aDL+' Mbps down / '+P.aUL+' Mbps up / '+P.aLat+' ms, one aircraft per site. Starlink beam '+P.bDL+' Mbps down / '+P.bUL+' Mbps up shared by a Poisson number of aircraft (mean '+P.nAC+'), capped at '+P.cDL+' / 40 Mbps per aircraft, '+P.lLat+' ms base latency plus 1.5% per aircraft above 8 (assumed).',
+      'Measured references: Ookla Q1 2025 Starlink in-flight medians 152 Mbps down, 24 Mbps up, 44 ms (arXiv 2508.09839). A2G upload and latency are assumptions to replace with SKYFive measurements.']);
+    await T.save(p,'Cabin_Speed_Test_A2G_vs_Starlink.pptx');$('msg').textContent='Deck saved.';
+  }catch(e){$('msg').textContent=e&&e.code==='declined'?'Export cancelled.':'Could not export the deck: '+(e&&e.message||e);}
+  b.disabled=false;});
+})();
+</script>
+
+</body>
+</html>
