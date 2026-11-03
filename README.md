@@ -2,7 +2,7 @@
 
 Two linked web pages for comparing SKYFive's A2G (air-to-ground) network with Starlink LEO for airline in-flight connectivity.
 
-- **Coverage compare** (`index.html`): 3D globe (flat map fallback) of each airline's routes, split by which network covers each stretch. A2G full roll-out plan with 150 km reach vs Starlink's own country availability map (read 3 Nov 2026) plus open sea. Add any airline, upload actual flight tracks as CSV, view A2G and Starlink side by side, export a PowerPoint.
+- **Coverage compare** (`index.html`): 3D globe (flat map fallback) of each airline's routes, split by which network covers each stretch. A2G full roll-out plan with 150 km reach vs Starlink's own country availability map (read 3 Nov 2026) plus open sea. Flat map by default with a 3D globe option. Switch between the A2G full plan and current A2G (live today: KSA + 44 European countries). Add any airline, upload actual flight tracks as CSV, view A2G and Starlink side by side, export a PowerPoint.
 - **Cabin speed test** (`speed-test.html`): animated per-aircraft download, upload and latency. A2G gives one aircraft per site the full 108 Mbps; a Starlink beam is shared by every aircraft flying under it. Exports a PowerPoint.
 
 Recommendation rule: when coverage is within 3 points, A2G is recommended (dedicated capacity, better upload and latency).

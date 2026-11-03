@@ -2,6 +2,20 @@
    Uses window.COVDATA, SKYGLOBE (globe snapshots) and PptxGenJS. */
 (function(){
 const D=window.COVDATA;
+// ---------- A2G basis: 'plan' (full roll-out plan) or 'now' (live today: KSA + 44 European countries)
+window.SKYMODE=window.SKYMODE||'plan';
+const SWAPS=[[/a country in the SKYFive A2G plan \(KSA, Europe, India, Oman, Turkey, Egypt, UAE, Qatar, Jordan, Iraq and the planned African and Asian markets\)/g,'a country where SKYFive A2G is live today (KSA and 44 European countries)'],
+  [/the full roll-out plan with a 150 km reach around each plan country/g,'the live network today (KSA and 44 European countries) with a 150 km reach'],
+  [/A2G FULL PLAN/g,'A2G TODAY'],[/A2G full plan/g,'A2G today'],[/A2G full-plan/g,'A2G today'],[/A2G plan/g,'A2G today'],[/the full A2G plan/g,'A2G today'],[/full plan/g,'today']];
+function T(str){ if(window.SKYMODE!=='now'||typeof str!=='string') return str; for(const [a,b] of SWAPS) str=str.replace(a,b); return str; }
+function deepT(v){ if(typeof v==='string') return T(v); if(Array.isArray(v)) return v.map(deepT); if(v&&typeof v==='object'&&!(v instanceof Uint8Array)){ const o={}; for(const k in v) o[k]=(k==='data'||k==='path')?v[k]:deepT(v[k]); return o; } return v; }
+let RAW=null; const NOWC={};
+function raw(){ if(!RAW){ RAW={airlines:Object.assign({},D.airlines),countries:D.countries}; for(const n in D.countries) NOWC[n]={...D.countries[n],plan:D.countries[n].now||0}; } return RAW; }
+function view(a,m){ if(m!=='now'||a.an_missing) return a; return {...a,net:{...a.net,a:a.net.an},tw:a.tw?{...a.tw,a:a.tw.an}:null,markets:a.markets?a.markets.map(x=>({...x,a:x.an})):null,gapsA:a.gapsN||[],
+  routes:a.routes.map(r=>({...r,a:r.an,pts:r.pts.map(p=>[p[0],p[1],((p[2]&4)?1:0)|(p[2]&2)|(p[2]&4)])}))}; }
+function setMode(m){ window.SKYMODE=m; const R=raw(); for(const n in R.airlines) D.airlines[n]=view(R.airlines[n],m); D.countries=m==='now'?NOWC:R.countries; }
+function setRaw(n,a){ raw().airlines[n]=a; D.airlines[n]=view(a,window.SKYMODE); }
+function getRaw(n){ return raw().airlines[n]; }
 // Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
 function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};
   const useTw=a.tw&&a.tw.flights>=50; return useTw?{a:a.tw.a,s:a.tw.s,basis:'traffic-weighted (FR24, '+a.tw.flights+' flights)'}:{a:a.net.a,s:a.net.s,basis:'all '+a.net.routes+' routes, by distance'+(a.name==='Oman Air'?' (actual tracks)':'')}; }
@@ -14,7 +28,8 @@ function rec(a){ const h=head(a), d=h.a-h.s;
   return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on today’s map. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
 const P={navy:'0B1B2E',ink:'0B1B2E',mute:'5B6B80',light:'F3F6FA',a2g:'1C8FD6',leo:'E07B24',line:'D5DEE8',white:'FFFFFF'};
 const today=()=>new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-function base(){ const p=new PptxGenJS(); p.layout='LAYOUT_WIDE'; p.author='SKYFive Arabia'; p.company='SKYFive Arabia'; p.theme={headFontFace:'Arial',bodyFontFace:'Calibri'};
+function base(){ const p=new PptxGenJS(); const add=p.addSlide.bind(p);
+  p.addSlide=(o)=>{ const sl=add(o); for(const f of ['addText','addTable','addChart']){ const g=sl[f].bind(sl); sl[f]=(...a)=>g(...a.map(deepT)); } return sl; }; p.layout='LAYOUT_WIDE'; p.author='SKYFive Arabia'; p.company='SKYFive Arabia'; p.theme={headFontFace:'Arial',bodyFontFace:'Calibri'};
   p.defineSlideMaster({title:'DARK',background:{color:'030916'},slideNumber:{x:12.4,y:7.0,w:0.6,h:0.3,color:'8FA3BA',fontSize:10}});
   p.defineSlideMaster({title:'LIGHT',background:{color:P.white},objects:[{text:{text:'SKYFive Arabia · A2G full plan ('+D.buffer_km+' km) vs Starlink · '+today(),options:{x:0.6,y:7.0,w:9,h:0.3,fontSize:10,color:P.mute}}}],slideNumber:{x:12.4,y:7.0,w:0.6,h:0.3,color:P.mute,fontSize:10}});
   return p; }
@@ -85,5 +100,5 @@ async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName
   const dl=await getDL();
   if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
   const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
-window.SKYCOV={head,rec,TIE,pct,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
+window.SKYCOV={head,rec,TIE,pct,T,setMode,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
 })();

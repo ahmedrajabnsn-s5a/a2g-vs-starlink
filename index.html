@@ -50,6 +50,9 @@ select{font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid 
 .btn.alt{border-color:#ffb877;background:linear-gradient(90deg,rgba(255,157,69,.2),rgba(63,216,255,.12))}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .layers{margin-left:0}
+.basis-t{margin-left:auto}
+.basis-t button[aria-pressed=true][data-m=now]{background:rgba(255,207,92,.16);color:#ffcf5c}
+.toggle{margin-left:0}
 @media(max-width:940px){.hero{grid-template-columns:1fr}}
 .card{background:rgba(10,26,48,.82);border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0}
 .gwrap{position:relative;height:min(680px,72vh);min-height:420px;padding:0;overflow:hidden}
@@ -129,6 +132,10 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       <button type="button" id="vOne" aria-pressed="true">Active airline</button>
       <button type="button" id="vAll" aria-pressed="false">All selected</button>
     </div>
+    <div class="toggle basis-t" role="group" aria-label="A2G network" title="Full plan = every country in the roll-out plan. Current = live today (KSA + 44 European countries).">
+      <button type="button" data-m="plan" aria-pressed="true">A2G full plan</button>
+      <button type="button" data-m="now" aria-pressed="false">Current A2G</button>
+    </div>
     <div class="toggle layers" role="group" aria-label="Map layer">
       <button type="button" data-l="both" aria-pressed="true">Both</button>
       <button type="button" data-l="a2g" aria-pressed="false">A2G only</button>
@@ -146,11 +153,11 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
 
   <section class="hero">
     <div class="card gwrap">
-      <canvas id="globe" aria-label="3D globe of the selected airline’s routes, coloured by which network covers each stretch"></canvas>
-      <canvas id="flat" hidden aria-label="Flat map of the selected airline’s routes, coloured by which network covers each stretch"></canvas>
-      <div class="toggle mapsw" role="group" aria-label="Map type"><button type="button" id="m3d" aria-pressed="true">3D globe</button><button type="button" id="m2d" aria-pressed="false">Flat map</button></div>
-      <div id="labels"></div>
-      <div class="hint">Drag to rotate · scroll to zoom</div>
+      <canvas id="globe" hidden aria-label="3D globe of the selected airline’s routes, coloured by which network covers each stretch"></canvas>
+      <canvas id="flat" aria-label="Flat map of the selected airline’s routes, coloured by which network covers each stretch"></canvas>
+      <div class="toggle mapsw" role="group" aria-label="Map type"><button type="button" id="m2d" aria-pressed="true">Flat map</button><button type="button" id="m3d" aria-pressed="false">3D globe</button></div>
+      <div id="labels" hidden></div>
+      <div class="hint">Flat map</div>
       <div class="pane-tag" id="tag1" hidden style="--c:var(--a2g)">A2G full plan<b id="tag1v"></b></div>
       <div class="legend" id="leg1">
         <span><i style="background:#eef6ff"></i>Both networks</span>
@@ -162,8 +169,8 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       </div>
     </div>
     <div class="card gwrap" id="pane2" hidden>
-      <canvas id="globe2" aria-label="3D globe showing Starlink coverage of the same routes"></canvas>
-      <canvas id="flat2" hidden aria-label="Flat map showing Starlink coverage of the same routes"></canvas>
+      <canvas id="globe2" hidden aria-label="3D globe showing Starlink coverage of the same routes"></canvas>
+      <canvas id="flat2" aria-label="Flat map showing Starlink coverage of the same routes"></canvas>
       <div id="labels2" style="position:absolute;inset:0;pointer-events:none"></div>
       <div class="hint">Follows the left map</div>
       <div class="pane-tag" style="--c:var(--leo)">Starlink<b id="tag2v"></b></div>
@@ -235,7 +242,7 @@ if(!sel.length) sel=['Oman Air','SalamAir'];
 let active=sel[0], viewAll=false, sortK='km', sortDir=-1;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(sel))}catch(e){}}
 // globe
-let G=null, G2=null, mode='3d', layer='both'; const L1=$('labels'), L2=$('labels2'); let lab1=[], lab2=[];
+let G=null, G2=null, mode='2d', layer='both'; const L1=$('labels'), L2=$('labels2'); let lab1=[], lab2=[];
 const split=()=>layer==='split', layer1=()=>split()?'a2g':layer;
 function place(g,labs){ for(const l of labs){ const p=g.project(l.p.lon,l.p.lat); l.el.style.left=p.x+'px'; l.el.style.top=p.y+'px'; l.el.style.opacity=p.vis?1:0; } }
 function onFrame(){ if(!G) return; place(G,lab1); if(split()&&G2){ G2.camera.position.copy(G.camera.position); G2.camera.lookAt(0,0,0); place(G2,lab2); } }
@@ -262,12 +269,12 @@ function drawGlobe(){ const names=viewAll?sel:[active], a=D.airlines[active], h=
     if(split()){ if(initGlobe2()){ G2.resize(); G2.setLayer('leo'); G2.show(names); lab2=labels(G2,L2); } } }
   catch(e){ console.warn(e); G=null; G2=null; setMode('2d','The 3D globe could not draw here, so this is the flat map.'); } }
 new ResizeObserver(()=>{ if(mode==='3d'){ if(G) G.resize(); if(G2&&split()) G2.resize(); } else drawGlobe(); }).observe(document.querySelector('.hero'));
-$('m3d').onclick=()=>setMode('3d'); $('m2d').onclick=()=>setMode('2d');
+$('m3d').onclick=()=>{ setMode('3d'); setTimeout(()=>{ if(mode==='3d'&&(!G||SKYGLOBE.looksBlank($('globe')))) setMode('2d','The 3D globe did not draw on this device, so this is the flat map.'); },3500); }; $('m2d').onclick=()=>setMode('2d');
 document.querySelectorAll('.layers button').forEach(b=>b.onclick=()=>setLayer(b.dataset.l));
 $('vs').onclick=()=>{ setLayer(split()?'both':'split'); document.querySelector('.hero').scrollIntoView({behavior:'smooth',block:'start'}); };
 function speedLink(){ $('toSpeed').href='speed-test.html#'+active.toLowerCase().replace(/[^a-z0-9]+/g,'-'); $('toSpeed').title='Open the cabin speed test for '+active; }
 // if the globe still shows nothing after it had time to draw, fall back automatically
-setTimeout(()=>{ if(mode==='3d'&&(!G||SKYGLOBE.looksBlank($('globe')))) setMode('2d','The 3D globe did not draw on this device, so this is the flat map. Try “3D globe” again any time.'); },3500);
+setTimeout(()=>{ if(false&&mode==='3d'&&(!G||SKYGLOBE.looksBlank($('globe')))) setMode('2d','The 3D globe did not draw on this device, so this is the flat map. Try “3D globe” again any time.'); },3500);
 // picker
 const byCountry={};D.order.forEach(n=>{const a=D.airlines[n];(byCountry[a.cc]=byCountry[a.cc]||[]).push(n);});
 function fillAdd(){ const s=$('add'); s.innerHTML='<option value="">Choose…</option>'+Object.entries(byCountry).map(([cc,ns])=>`<optgroup label="${cc}">`+ns.filter(n=>!sel.includes(n)).map(n=>`<option>${n}</option>`).join('')+'</optgroup>').join(''); }
@@ -301,12 +308,26 @@ function renderAirline(){
 function renderCmp(){ $('cmp').innerHTML='<tr><th>Airline</th><th>A2G full plan</th><th>Starlink</th><th>Recommend</th><th>Routes</th><th style="text-align:left">Basis</th></tr>'+sel.map(n=>{const a=D.airlines[n],h=SKYCOV.head(a),d=Math.round(h.a-h.s),rc=SKYCOV.rec(a);
   return `<tr class="${n===active?'on':''}" data-n="${n}" style="cursor:pointer"><td>${n}</td><td class="a"><b>${pct(h.a)}</b></td><td class="l"><b>${pct(h.s)}</b></td><td>${rc.pick==='A2G'?'<span class="pill a">A2G · '+(rc.kind==='tie'?'level, faster':'+'+d)+'</span>':'<span class="pill l">Starlink +'+(-d)+'</span>'}</td><td>${a.net.routes}</td><td class="basis" style="text-align:left">${h.basis}</td></tr>`;}).join('');
   $('cmp').querySelectorAll('tr[data-n]').forEach(tr=>tr.onclick=()=>{active=tr.dataset.n;renderAll();}); }
-function renderAll(){ chips(); fillAdd(); renderCmp(); renderAirline(); speedLink(); drawGlobe(); }
+const ORIGTXT=new WeakMap();
+function relabel(){ const w=document.createTreeWalker(document.querySelector('.wrap'),NodeFilter.SHOW_TEXT); let n;
+  while((n=w.nextNode())){ if(n.parentElement&&n.parentElement.closest('.basis-t')) continue; if(!ORIGTXT.has(n)) ORIGTXT.set(n,n.nodeValue); const o=ORIGTXT.get(n), v=SKYCOV.T(o); if(n.nodeValue!==v) n.nodeValue=v; } }
+let amode='plan';
+document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ amode=b.dataset.m; document.querySelectorAll('.basis-t button').forEach(x=>x.setAttribute('aria-pressed',x===b)); SKYCOV.setMode(amode);
+  $('msg').textContent=amode==='now'?'Showing current A2G: the network live today (KSA and 44 European countries) with 150 km reach.':'Showing the A2G full roll-out plan with 150 km reach.'; renderAll(); });
+function renderAll(){ chips(); fillAdd(); renderCmp(); renderAirline(); speedLink(); drawGlobe(); relabel(); }
 // ---------- CSV upload: score actual tracks in the browser on a 0.2° grid (country + A2G 150 km reach)
-const GR=window.COVGRID; let GC=null,GRc=null;
+const GR=window.COVGRID; let GC=null,GRc=null,GRn=null;
 function unrle(a){ const o=new Uint8Array(GR.nx*GR.ny); let k=0; for(let i=0;i<a.length;i+=2){ o.fill(a[i],k,k+a[i+1]); k+=a[i+1]; } return o; }
-function cell(lon,lat){ if(!GC){GC=unrle(GR.cells);GRc=unrle(GR.reach);} const x=Math.floor((lon-GR.lon0)/GR.res), y=Math.floor((GR.lat1-lat)/GR.res);
-  if(x<0||y<0||x>=GR.nx||y>=GR.ny) return {c:null,a:0,s:1}; const i=y*GR.nx+x, ci=GC[i], c=ci?GR.names[ci-1]:null; return {c:c?c.n:'Open sea',a:GRc[i]?1:0,s:c?c.sl:1}; }
+function nowReach(){ // live-today countries dilated by 150 km on the same grid
+  const NX=GR.nx,NY=GR.ny,o=new Uint8Array(NX*NY),RC=SKYCOV.getRaw?null:null, live=GR.names.map(c=>{const x=(window.COVDATA_RAWC||{})[c.n];return x?x.now:0;});
+  const isL=i=>GC[i]&&live[GC[i]-1]; const ry=Math.ceil(150/(111*GR.res));
+  for(let y=0;y<NY;y++)for(let x=0;x<NX;x++){const i=y*NX+x;if(!isL(i))continue;o[i]=1;
+    const edge=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const xx=x+dx,yy=y+dy;return xx<0||yy<0||xx>=NX||yy>=NY||!isL(yy*NX+xx);}); if(!edge) continue;
+    for(let dy=-ry;dy<=ry;dy++){const yy=y+dy;if(yy<0||yy>=NY)continue;const la=GR.lat1-(yy+.5)*GR.res, kx=111*Math.cos(la*Math.PI/180)*GR.res, ky=111*GR.res, rx=Math.ceil(150/Math.max(kx,5));
+      for(let dx=-rx;dx<=rx;dx++){const xx=x+dx;if(xx<0||xx>=NX)continue;if((dx*kx)**2+(dy*ky)**2<=22500)o[yy*NX+xx]=1;}}}
+  return o; }
+function cell(lon,lat){ if(!GC){GC=unrle(GR.cells);GRc=unrle(GR.reach);GRn=nowReach();} const x=Math.floor((lon-GR.lon0)/GR.res), y=Math.floor((GR.lat1-lat)/GR.res);
+  if(x<0||y<0||x>=GR.nx||y>=GR.ny) return {c:null,a:0,s:1,n:0}; const i=y*GR.nx+x, ci=GC[i], c=ci?GR.names[ci-1]:null; return {c:c?c.n:'Open sea',a:GRc[i]?1:0,s:c?c.sl:1,n:GRn[i]&&GRc[i]?1:0}; }
 const hav=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
 function splitCSV(line){ const o=[];let cur='',q=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch==='"'){q=!q;continue;} if(ch===','&&!q){o.push(cur);cur='';continue;} cur+=ch;} o.push(cur); return o.map(v=>v.trim()); }
 function parseTracks(text,airline){
@@ -324,38 +345,38 @@ function parseTracks(text,airline){
     const key=(iC>=0?v[iC]:'')+'|'+o+'|'+d; (fl.get(key)||fl.set(key,[]).get(key)).push([t,lon,lat]); }
   // split each key into flights on gaps of 3 h or more
   const flights=[]; for(const [key,arr] of fl){ arr.sort((a,b)=>a[0]-b[0]); let cur=[arr[0]]; for(let i=1;i<arr.length;i++){ if(arr[i][0]-arr[i-1][0]>10800){flights.push([key,cur]);cur=[];} cur.push(arr[i]); } flights.push([key,cur]); }
-  const routes=new Map(), GA={}, GS={}; let TK=0,TA=0,TS=0,nF=0;
+  const routes=new Map(), GA={}, GS={}, GN={}; let TK=0,TA=0,TS=0,TN=0,nF=0;
   for(const [key,pts] of flights){ if(pts.length<5) continue; const [,o,d]=key.split('|'); let P=[]; for(const p of pts){ const q=[p[1],p[2]]; if(!P.length||hav(P[P.length-1],q)>=3) P.push(q); }
     if(P.length<3) continue; // densify long gaps along the great circle
     const Q=[P[0]]; for(let i=1;i<P.length;i++){ const L=hav(P[i-1],P[i]); if(L>15){ const f=d3.geoInterpolate(P[i-1],P[i]), n=Math.ceil(L/10); for(let j=1;j<n;j++) Q.push(f(j/n)); } Q.push(P[i]); }
-    const fl2=Q.map(p=>{const g=cell(p[0],p[1]); return [p[0],p[1],(g.a?1:0)|(g.s?2:0),g.c];}); let T=0,A=0,S=0;
-    for(let i=0;i<fl2.length-1;i++){ const L=hav(fl2[i],fl2[i+1]); T+=L; const ca=(fl2[i][2]&1)&&(fl2[i+1][2]&1), cs=(fl2[i][2]&2)&&(fl2[i+1][2]&2); if(ca)A+=L; if(cs)S+=L;
+    const fl2=Q.map(p=>{const g=cell(p[0],p[1]); return [p[0],p[1],(g.a?1:0)|(g.s?2:0)|(g.n?4:0),g.c];}); let T=0,A=0,S=0,AN=0;
+    for(let i=0;i<fl2.length-1;i++){ const L=hav(fl2[i],fl2[i+1]); T+=L; const ca=(fl2[i][2]&1)&&(fl2[i+1][2]&1), cs=(fl2[i][2]&2)&&(fl2[i+1][2]&2); if(ca)A+=L; if(cs)S+=L; const cn=(fl2[i][2]&4)&&(fl2[i+1][2]&4); if(cn)AN+=L; else {const c=!(fl2[i][2]&4)?fl2[i][3]:fl2[i+1][3]; GN[c]=(GN[c]||0)+L;}
       if(!ca){const c=!(fl2[i][2]&1)?fl2[i][3]:fl2[i+1][3]; GA[c]=(GA[c]||0)+L;} if(!cs){const c=!(fl2[i][2]&2)?fl2[i][3]:fl2[i+1][3]; GS[c]=(GS[c]||0)+L;} }
-    if(T<50) continue; nF++; TK+=T; TA+=A; TS+=S;
+    if(T<50) continue; nF++; TK+=T; TA+=A; TS+=S; TN+=AN;
     const hubFirst=(o===airline.hub||!airline.hubs.includes(d)); const rk=hubFirst?o+'-'+d:d+'-'+o;
-    const r=routes.get(rk)||{o:hubFirst?o:d,d:hubFirst?d:o,km:0,a:0,s:0,n:0,pts:null,best:0}; r.n++; r.km+=T; r.a+=A; r.s+=S;
+    const r=routes.get(rk)||{o:hubFirst?o:d,d:hubFirst?d:o,km:0,a:0,s:0,n:0,pts:null,best:0}; r.n++; r.km+=T; r.a+=A; r.s+=S; r.an=(r.an||0)+AN;
     if(T>r.best){ r.best=T; const th=[fl2[0]]; let acc=0; for(let i=1;i<fl2.length-1;i++){ acc+=hav(fl2[i-1],fl2[i]); if(acc>=25||fl2[i][2]!==th[th.length-1][2]){ th.push(fl2[i]); acc=0; } } th.push(fl2[fl2.length-1]); r.pts=th.map(p=>[+p[0].toFixed(2),+p[1].toFixed(2),p[2]]); }
     routes.set(rk,r);
     [[o,P[0]],[d,P[P.length-1]]].forEach(([c,p])=>{ if(!D.airports[c]) D.airports[c]={lat:p[1],lon:p[0],city:c}; }); }
   if(!nF) throw new Error('No complete flights found in the file.');
   const top=o=>Object.entries(o).map(([k,v])=>[k,+(v/TK*100).toFixed(1)]).filter(x=>x[1]>=0.1).sort((x,y)=>y[1]-x[1]).slice(0,6);
-  return {...airline,uploaded:{flights:nF},tw:null,markets:null,net:{a:TA/TK*100,s:TS/TK*100,routes:routes.size},gapsA:top(GA),gapsS:top(GS),
-    routes:[...routes.values()].map(r=>({o:r.o,d:r.d,km:Math.round(r.km/r.n),src:'upload',a:Math.round(r.a/r.km*100),s:Math.round(r.s/r.km*100),seats:null,flights:r.n,pts:r.pts}))};
+  return {...airline,uploaded:{flights:nF},tw:null,markets:null,net:{a:TA/TK*100,s:TS/TK*100,an:TN/TK*100,routes:routes.size},gapsA:top(GA),gapsS:top(GS),gapsN:top(GN),
+    routes:[...routes.values()].map(r=>({o:r.o,d:r.d,km:Math.round(r.km/r.n),src:'upload',a:Math.round(r.a/r.km*100),s:Math.round(r.s/r.km*100),an:Math.round((r.an||0)/r.km*100),seats:null,flights:r.n,pts:r.pts}))};
 }
-const ORIG={}; const upKey=n=>'skyfive-cov-upload-'+n;
-function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=D.airlines[n]; D.airlines[n]=obj; }
+window.COVDATA_RAWC=D.countries; const ORIG={}; const upKey=n=>'skyfive-cov-upload2-'+n;
+function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=SKYCOV.getRaw(n)||D.airlines[n]; SKYCOV.setRaw(n,obj); }
 // restore uploads saved in this browser
-Object.keys(D.airlines).forEach(n=>{ try{ const s=localStorage.getItem(upKey(n)); if(s){ const o=JSON.parse(s); Object.assign(D.airports,o.__ap||{}); delete o.__ap; applyUpload(n,o); } }catch(e){} });
+Object.keys(D.airlines).forEach(n=>{ try{ const s=localStorage.getItem(upKey(n)); if(s){ const o=JSON.parse(s); if(!o.net||o.net.an==null) return; Object.assign(D.airports,o.__ap||{}); delete o.__ap; applyUpload(n,o); } }catch(e){} });
 async function handleFile(f){ if(!f) return; const n=active; $('msg').textContent='Reading '+f.name+'…'; await new Promise(r=>setTimeout(r,20));
-  try{ const obj=parseTracks(await f.text(),ORIG[n]||D.airlines[n]); obj.uploaded.file=f.name; applyUpload(n,obj);
+  try{ const obj=parseTracks(await f.text(),ORIG[n]||SKYCOV.getRaw(n)||D.airlines[n]); obj.uploaded.file=f.name; applyUpload(n,obj);
     try{ const ap={}; obj.routes.forEach(r=>[r.o,r.d].forEach(c=>ap[c]=D.airports[c])); localStorage.setItem(upKey(n),JSON.stringify({...obj,__ap:ap})); }catch(e){}
-    $('msg').textContent=`${n}: using ${obj.uploaded.flights} flights on ${obj.net.routes} routes from ${f.name}. A2G ${Math.round(obj.net.a)}% vs Starlink ${Math.round(obj.net.s)}%.`; renderAll(); }
+    $('msg').textContent=`${n}: using ${obj.uploaded.flights} flights on ${obj.net.routes} routes from ${f.name}. A2G planned network ${Math.round(obj.net.a)}%, A2G live today ${Math.round(obj.net.an)}%, Starlink ${Math.round(obj.net.s)}%.`; renderAll(); }
   catch(e){ $('msg').textContent='Could not read that file: '+e.message; } }
 $('csv').onchange=e=>{ handleFile(e.target.files[0]); e.target.value=''; };
 const up=$('up'); ['dragenter','dragover'].forEach(t=>up.addEventListener(t,e=>{e.preventDefault();up.classList.add('drag');}));
 ['dragleave','drop'].forEach(t=>up.addEventListener(t,e=>{e.preventDefault();up.classList.remove('drag');}));
 up.addEventListener('drop',e=>handleFile(e.dataTransfer.files[0]));
-$('revert').onclick=()=>{ const n=active; if(ORIG[n]){ D.airlines[n]=ORIG[n]; delete ORIG[n]; } try{localStorage.removeItem(upKey(n))}catch(e){} $('msg').textContent=n+': back to the built-in routes.'; renderAll(); };
+$('revert').onclick=()=>{ const n=active; if(ORIG[n]){ SKYCOV.setRaw(n,ORIG[n]); delete ORIG[n]; } try{localStorage.removeItem(upKey(n))}catch(e){} $('msg').textContent=n+': back to the built-in routes.'; renderAll(); };
 renderAll();
 // PPT export
 // Export button stays visible; save() waits for the viewer and explains if downloads are blocked here.

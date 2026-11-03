@@ -32,7 +32,7 @@ function texture(w,L){ L=L||'both'; const SHOW_A=L!=='leo', SHOW_S=L!=='a2g';
   if(SHOW_S) for(const f of F){ const i=info(f.properties.name); if(!OKS.has(i.sl)||(i.plan&&SHOW_A)) continue; c.beginPath(); path(f); c.strokeStyle='rgba(255,190,120,.75)'; c.lineWidth=w/1800; c.stroke(); }
   const t=new THREE.CanvasTexture(cv); t.anisotropy=8; return t;
 }
-const TEX={}; function tex(L){ L=L||'both'; return TEX[L]||(TEX[L]=texture(4096,L)); }
+const TEX={}; function tex(L){ L=L||'both'; const k=L+'|'+(window.SKYMODE||'plan'); return TEX[k]||(TEX[k]=texture(4096,L)); }
 
 function create(canvas,opt){
   opt=opt||{}; const W=()=>opt.width||canvas.clientWidth||800, H=()=>opt.height||canvas.clientHeight||600;
@@ -128,11 +128,11 @@ function snap3d(names,o){ const w=o.w||1920,h=o.h||1500;
   c.textBaseline='middle'; const fs=Math.round(w/88);
   for(const a of G.airports()){ const p=G.project(a.p.lon,a.p.lat); if(!p.vis) continue;
     c.font=`${a.hub?700:600} ${a.hub?fs*1.3:fs}px "IBM Plex Mono", monospace`; c.lineWidth=5; c.strokeStyle='rgba(3,9,22,.9)'; c.strokeText(a.c,p.x+10,p.y-12); c.fillStyle=a.hub?'#ffffff':'#d7e8f7'; c.fillText(a.c,p.x+10,p.y-12); }
-  if(o.legend!==false){ const L=o.layer||'both'; const items=L==='a2g'?[['a2g','A2G full plan covers'],['none','No A2G']]:L==='leo'?[['leo','Starlink covers'],['none','No Starlink']]:[['both','Both networks'],['a2g','A2G full plan only'],['leo','Starlink only'],['none','Neither']]; const y=h-fs*2.6;
+  if(o.legend!==false){ const L=o.layer||'both'; const items=L==='a2g'?[['a2g',(window.SKYCOV?SKYCOV.T('A2G full plan covers'):'A2G full plan covers')],['none','No A2G']]:L==='leo'?[['leo','Starlink covers'],['none','No Starlink']]:[['both','Both networks'],['a2g',(window.SKYCOV?SKYCOV.T('A2G full plan only'):'A2G full plan only')],['leo','Starlink only'],['none','Neither']]; const y=h-fs*2.6;
     c.fillStyle='rgba(3,9,22,.72)'; c.fillRect(0,y-fs*1.8,w,fs*3.6);
     c.font=`500 ${fs}px "IBM Plex Sans", sans-serif`; let x=w*0.03;
     for(const [k,t] of items){ c.strokeStyle=HEX[k]; c.lineWidth=fs*.35; c.setLineDash(k==='none'?[fs*.5,fs*.45]:[]); c.beginPath(); c.moveTo(x,y); c.lineTo(x+fs*2.6,y); c.stroke(); c.setLineDash([]); c.fillStyle='#e9f2fb'; c.fillText(t,x+fs*3.2,y); x+=fs*3.2+c.measureText(t).width+fs*1.8; }
-    if(L!=='leo'){ c.fillStyle='rgba(38,150,205,.7)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('A2G plan + '+CD.buffer_km+' km',x+fs*2.6,y); x+=fs*2.6+c.measureText('A2G plan + '+CD.buffer_km+' km').width+fs*1.8; }
+    if(L!=='leo'){ c.fillStyle='rgba(38,150,205,.7)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText((window.SKYMODE==='now'?'A2G today + ':'A2G plan + ')+CD.buffer_km+' km',x+fs*2.6,y); x+=fs*2.6+c.measureText((window.SKYMODE==='now'?'A2G today + ':'A2G plan + ')+CD.buffer_km+' km').width+fs*1.8; }
     if(L!=='a2g'){ c.fillStyle='rgba(190,118,48,.85)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('Starlink available',x+fs*2.6,y); } }
   if(o.title){ c.font=`700 ${Math.round(fs*1.9)}px "Chakra Petch", sans-serif`; c.fillStyle='#ffffff'; c.textBaseline='top'; c.fillText(o.title,w*0.03,h*0.03); }
   return out.toDataURL('image/png');
