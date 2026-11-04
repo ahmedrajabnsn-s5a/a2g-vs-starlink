@@ -11,10 +11,10 @@ function T(str){ if(window.SKYMODE!=='now'||typeof str!=='string') return str; f
 function deepT(v){ if(typeof v==='string') return T(v); if(Array.isArray(v)) return v.map(deepT); if(v&&typeof v==='object'&&!(v instanceof Uint8Array)){ const o={}; for(const k in v) o[k]=(k==='data'||k==='path')?v[k]:deepT(v[k]); return o; } return v; }
 // ---------- live coverage engine: raw points [lon,lat,countryIdx,unitMask] -> coverage per airline
 const RAWA=D.airlines, RAWC=D.countries; D.airlines={}; D.rawCountries=RAWC;
-const ST={mode:'plan',off:new Set(),cs:false};
+const ST={mode:'plan',off:new Set(),cs:new Set()}; // cs = Starlink future countries counted as available
 const SLOK=new Set(['launched','available']), CS_OK=new Set(['coming_soon','pending_regulatory','unknown']);
 const CS_NEVER=new Set(['India','Turkey','China','Egypt']);
-function slOk(n,st){ if(st==='sea') return true; if(SLOK.has(st)) return true; return ST.cs&&CS_OK.has(st)&&!CS_NEVER.has(n); }
+function slOk(n,st){ if(st==='sea') return true; if(SLOK.has(st)) return true; return ST.cs.has(n)&&!CS_NEVER.has(n); }
 function activeMask(){ let m=0; D.units.forEach((u,i)=>{ if(ST.off.has(u.id)) return; if(ST.mode==='now'&&u.tier!==0) return; m|=(1<<i); }); return m>>>0; }
 const hav=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
 let OKC=[], ACT=0;
@@ -35,16 +35,18 @@ function build(r){ const ev=r.routes.map(x=>evalPts(x.pts)); let W=0,A=0,S=0; co
     net:{a:A/W*100,s:S/W*100,routes:r.routes.length},tw,markets,gapsA:top(GA),gapsS:top(GS),
     routes:r.routes.map((x,i)=>({o:x.o,d:x.d,km:x.km,src:x.src,seats:x.seats||null,flights:x.flights||null,a:Math.round(ev[i].a*100),s:Math.round(ev[i].s*100),pts:ev[i].fl}))}; }
 function recompute(){ window.SKYMODE=ST.mode; ACT=activeMask(); OKC=D.cnames.map(c=>slOk(c.n,c.st));
-  const C={}; for(const n in RAWC){ const c=RAWC[n]; C[n]={sl:slOk(n,c.st)?'available':'no',plan:c.unit>=0&&(ACT&(1<<c.unit))?1:0}; } D.countries=C;
+  const C={}; for(const n in RAWC){ const c=RAWC[n]; const pl=c.unit>=0&&(ACT&(1<<c.unit))?1:0; C[n]={sl:slOk(n,c.st)?'available':'no',plan:pl,planFut:pl&&D.units[c.unit].tier!==0?1:0,slFut:(!SLOK.has(c.st)&&slOk(n,c.st))?1:0}; } D.countries=C;
   for(const n in RAWA) D.airlines[n]=build(RAWA[n]);
-  window.SKYSTATE=ST.mode+'|'+[...ST.off].sort().join(',')+'|'+(ST.cs?1:0); }
-function set(o){ if(o.mode) ST.mode=o.mode; if(o.off) ST.off=new Set(o.off); if(o.cs!=null) ST.cs=!!o.cs; recompute(); }
+  window.SKYSTATE=ST.mode+'|'+[...ST.off].sort().join(',')+'|'+[...ST.cs].sort().join(','); }
+function set(o){ if(o.mode) ST.mode=o.mode; if(o.off) ST.off=new Set(o.off); if(o.cs!=null) ST.cs=new Set(o.cs===true?csAdded():o.cs===false?[]:o.cs); recompute(); }
 function setMode(m){ set({mode:m}); }
 function setRaw(n,a){ RAWA[n]=a; D.airlines[n]=build(a); }
 function getRaw(n){ return RAWA[n]; }
 function csAdded(){ return Object.entries(RAWC).filter(([n,c])=>CS_OK.has(c.st)&&!CS_NEVER.has(n)).map(([n])=>n).sort(); }
+function csGroups(){ const all=Object.entries(RAWC).filter(([n,c])=>CS_OK.has(c.st)&&!CS_NEVER.has(n)); const g={pending_regulatory:[],coming_soon:[],unknown:[]};
+  all.forEach(([n,c])=>g[c.st].push(n)); for(const k in g) g[k].sort((a,b)=>a==='Saudi Arabia'?-1:b==='Saudi Arabia'?1:a.localeCompare(b)); return g; }
 function note(){ const L=[]; if(ST.off.size) L.push('A2G excludes: '+D.units.filter(u=>ST.off.has(u.id)).map(u=>u.name).join(', '));
-  if(ST.cs) L.push('Starlink includes its coming-soon, pending and unknown countries, except India, Turkey, China and Egypt'); return L; }
+  if(ST.cs.size) L.push('Starlink future countries added: '+(ST.cs.size>8?ST.cs.size+' countries'+(ST.cs.has('Saudi Arabia')?' incl. Saudi Arabia':''):[...ST.cs].sort().join(', '))+' (never India, Turkey, China, Egypt)'); return L; }
 recompute();
 // Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
 function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};
@@ -55,7 +57,7 @@ const WHY='A2G gives each aircraft a dedicated 108 Mbps site (no sharing), with 
 function rec(a){ const h=head(a), d=h.a-h.s;
   if(d>TIE) return {pick:'A2G',kind:'coverage',short:'A2G · better coverage',text:`Recommend A2G: it covers ${Math.round(d)} points more of the flight time. ${WHY}.`};
   if(d>=-TIE) return {pick:'A2G',kind:'tie',short:'A2G · coverage level, better speed',text:`Coverage is level (${pct(h.a)} vs ${pct(h.s)}), so recommend A2G: ${WHY}.`};
-  return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on ${ST.cs?'its map with coming-soon countries added':'today’s map'}. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
+  return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on ${ST.cs.size?'its map with future countries added':'today’s map'}. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
 const P={navy:'0B1B2E',ink:'0B1B2E',mute:'5B6B80',light:'F3F6FA',a2g:'1C8FD6',leo:'E07B24',line:'D5DEE8',white:'FFFFFF'};
 const today=()=>new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
 function base(){ const p=new PptxGenJS(); const add=p.addSlide.bind(p);
@@ -130,5 +132,5 @@ async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName
   const dl=await getDL();
   if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
   const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
-window.SKYCOV={head,rec,TIE,pct,T,setMode,set,state:()=>({mode:ST.mode,off:[...ST.off],cs:ST.cs}),csAdded,note,CS_NEVER,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
+window.SKYCOV={head,rec,TIE,pct,T,setMode,set,state:()=>({mode:ST.mode,off:[...ST.off],cs:[...ST.cs]}),csAdded,csGroups,note,CS_NEVER,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
 })();

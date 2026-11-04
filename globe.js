@@ -21,14 +21,14 @@ function texture(w,L){ L=L||'both'; const SHOW_A=L!=='leo', SHOW_S=L!=='a2g';
   const F=feats(), info=n=>CD.countries[n]||{};
   for(const f of F){ c.beginPath(); path(f); c.fillStyle='rgba(18,34,72,.62)'; c.fill(); }
   // Starlink-available land (amber)
-  if(SHOW_S) for(const f of F){ const i=info(f.properties.name); if(!OKS.has(i.sl)) continue; c.beginPath(); path(f); c.fillStyle=L==='leo'?'rgba(214,132,52,.6)':'rgba(190,118,48,.42)'; c.fill(); }
+  if(SHOW_S) for(const f of F){ const i=info(f.properties.name); if(!OKS.has(i.sl)) continue; c.beginPath(); path(f); c.fillStyle=i.slFut?(L==='leo'?'rgba(240,190,140,.34)':'rgba(232,180,128,.26)'):(L==='leo'?'rgba(214,132,52,.6)':'rgba(190,118,48,.42)'); c.fill(); }
   // A2G 150 km reach: a band around each plan country, 2 x 150 km wide
   const band=w/360*(2*CD.buffer_km/111);
   c.lineJoin='round'; c.lineCap='round';
-  if(SHOW_A) for(const f of F){ if(!info(f.properties.name).plan) continue; c.beginPath(); path(f); c.lineWidth=band; c.strokeStyle='rgba(63,216,255,.16)'; c.stroke(); }
-  if(SHOW_A) for(const f of F){ if(!info(f.properties.name).plan) continue; c.beginPath(); path(f); c.fillStyle='rgba(38,150,205,.42)'; c.fill(); }
+  if(SHOW_A) for(const f of F){ if(!info(f.properties.name).plan) continue; c.beginPath(); path(f); c.lineWidth=band; c.strokeStyle=info(f.properties.name).planFut?'rgba(150,230,255,.09)':'rgba(63,216,255,.16)'; c.stroke(); }
+  if(SHOW_A) for(const f of F){ if(!info(f.properties.name).plan) continue; c.beginPath(); path(f); c.fillStyle=info(f.properties.name).planFut?'rgba(140,215,245,.22)':'rgba(38,150,205,.5)'; c.fill(); }
   c.beginPath(); for(const f of F) path(f); c.strokeStyle='rgba(110,150,220,.4)'; c.lineWidth=w/2600; c.stroke();
-  if(SHOW_A) for(const f of F){ const i=info(f.properties.name); if(!i.plan) continue; c.beginPath(); path(f); c.shadowColor='rgb(70,222,255)'; c.shadowBlur=w/900; c.strokeStyle='rgba(150,240,255,.9)'; c.lineWidth=w/1500; c.stroke(); c.shadowBlur=0; }
+  if(SHOW_A) for(const f of F){ const i=info(f.properties.name); if(!i.plan) continue; c.beginPath(); path(f); c.shadowColor='rgb(70,222,255)'; c.shadowBlur=i.planFut?0:w/900; c.strokeStyle=i.planFut?'rgba(170,235,255,.45)':'rgba(150,240,255,.9)'; c.lineWidth=w/1500; c.stroke(); c.shadowBlur=0; }
   if(SHOW_S) for(const f of F){ const i=info(f.properties.name); if(!OKS.has(i.sl)||(i.plan&&SHOW_A)) continue; c.beginPath(); path(f); c.strokeStyle='rgba(255,190,120,.75)'; c.lineWidth=w/1800; c.stroke(); }
   const t=new THREE.CanvasTexture(cv); t.anisotropy=8; return t;
 }
@@ -133,7 +133,9 @@ function snap3d(names,o){ const w=o.w||1920,h=o.h||1500;
     c.font=`500 ${fs}px "IBM Plex Sans", sans-serif`; let x=w*0.03;
     for(const [k,t] of items){ c.strokeStyle=HEX[k]; c.lineWidth=fs*.35; c.setLineDash(k==='none'?[fs*.5,fs*.45]:[]); c.beginPath(); c.moveTo(x,y); c.lineTo(x+fs*2.6,y); c.stroke(); c.setLineDash([]); c.fillStyle='#e9f2fb'; c.fillText(t,x+fs*3.2,y); x+=fs*3.2+c.measureText(t).width+fs*1.8; }
     if(L!=='leo'){ c.fillStyle='rgba(38,150,205,.7)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText((window.SKYMODE==='now'?'A2G today + ':'A2G plan + ')+CD.buffer_km+' km',x+fs*2.6,y); x+=fs*2.6+c.measureText((window.SKYMODE==='now'?'A2G today + ':'A2G plan + ')+CD.buffer_km+' km').width+fs*1.8; }
-    if(L!=='a2g'){ c.fillStyle='rgba(190,118,48,.85)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('Starlink available',x+fs*2.6,y); } }
+    if(L!=='leo'&&window.SKYMODE!=='now'){ c.fillStyle='rgba(140,215,245,.5)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('A2G future',x+fs*2.6,y); x+=fs*2.6+c.measureText('A2G future').width+fs*1.8; }
+    if(L!=='a2g'){ c.fillStyle='rgba(190,118,48,.85)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('Starlink available',x+fs*2.6,y); x+=fs*2.6+c.measureText('Starlink available').width+fs*1.8;
+      if(Object.values(CD.countries).some(q=>q.slFut)){ c.fillStyle='rgba(240,190,140,.55)'; c.fillRect(x,y-fs*.55,fs*2,fs*1.1); c.fillStyle='#e9f2fb'; c.fillText('Starlink future',x+fs*2.6,y); } } }
   if(o.title){ c.font=`700 ${Math.round(fs*1.9)}px "Chakra Petch", sans-serif`; c.fillStyle='#ffffff'; c.textBaseline='top'; c.fillText(o.title,w*0.03,h*0.03); }
   return out.toDataURL('image/png');
 }

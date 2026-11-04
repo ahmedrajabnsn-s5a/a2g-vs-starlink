@@ -10,7 +10,8 @@ Recommendation rule: when coverage is within 3 points, A2G is recommended (dedic
 
 ## Smart controls
 - **A2G countries**: tick or untick any country (Europe as one block) in the A2G plan; every score, map and PPT updates.
-- **＋ Starlink coming soon**: adds the countries Starlink lists as coming soon, pending approval or unknown, always excluding India, Turkey, China and Egypt.
+- **＋ Starlink future**: drop-down of Starlink's not-yet-available countries (pending approval, coming soon, unknown), KSA first, with KSA-only / all-pending / all shortcuts. India, Turkey, China and Egypt are always excluded.
+- **Map shading**: live A2G and available Starlink countries in full colour; A2G future-plan countries and chosen Starlink future countries in a lighter shade.
 - **A2G full plan / Current A2G**: full roll-out plan or the network live today (KSA + 44 European countries).
 
 ## Data

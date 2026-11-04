@@ -66,6 +66,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .dd label{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:4px 4px;border-radius:6px;cursor:pointer}
 .dd label:hover{background:rgba(255,255,255,.04)}
 .dd input{accent-color:var(--a2g);width:16px;height:16px}
+#csPan input{accent-color:#ff9d45}
+#csPan label.never{opacity:.5;cursor:not-allowed}
+#csPan label.ksa{font-weight:600}
 .dd small{color:var(--mute)}
 .state{font-size:12.5px;color:#ffcf5c}
 .basis-t button[aria-pressed=true][data-m=now]{background:rgba(255,207,92,.16);color:#ffcf5c}
@@ -153,7 +156,10 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       <button type="button" class="smart a" id="ctyBtn" aria-expanded="false" aria-controls="ctyPan" title="Choose which countries count in the A2G plan">A2G countries <b id="ctyN"></b> ▾</button>
       <div class="dd" id="ctyPan" hidden role="dialog" aria-label="Countries in the A2G calculation"></div>
     </div>
-    <button type="button" class="smart" id="cs" aria-pressed="false" title="">＋ Starlink coming soon</button>
+    <div class="ddw">
+      <button type="button" class="smart" id="cs" aria-expanded="false" aria-pressed="false" aria-controls="csPan" title="Choose Starlink future countries to count as covered">＋ Starlink future <b id="csN"></b> ▾</button>
+      <div class="dd" id="csPan" hidden role="dialog" aria-label="Starlink future countries"></div>
+    </div>
     <div class="toggle basis-t" role="group" aria-label="A2G network" title="Full plan = every country in the roll-out plan. Current = live today (KSA + 44 European countries).">
       <button type="button" data-m="plan" aria-pressed="true">A2G full plan</button>
       <button type="button" data-m="now" aria-pressed="false">Current A2G</button>
@@ -186,8 +192,10 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
         <span><i style="background:var(--a2g)"></i>A2G full plan only</span>
         <span><i style="background:var(--leo)"></i>Starlink only</span>
         <span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>Neither</span>
-        <span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G plan + 150 km</span>
+        <span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G live</span>
+        <span><i class="sq" style="background:rgba(140,215,245,.45)"></i>A2G future</span>
         <span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span>
+        <span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>
       </div>
     </div>
     <div class="card gwrap" id="pane2" hidden>
@@ -200,6 +208,7 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
         <span><i style="background:var(--leo)"></i>Starlink covers</span>
         <span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No Starlink</span>
         <span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span>
+        <span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>
       </div>
     </div>
     <aside class="card score">
@@ -278,9 +287,9 @@ function setMode(m,why){ mode=m; $('m3d').setAttribute('aria-pressed',m==='3d');
   if(why) $('msg').textContent=why; drawGlobe(); }
 function fit(cv){ const r=cv.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1); if(!r.width) return false; cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); return true; }
 function labels(g,box){ box.innerHTML=''; return g.airports().map(a=>{const el=document.createElement('div');el.className='lab'+(a.hub?' hub':'');el.textContent=a.c;box.appendChild(el);return {el,p:a.p};}); }
-const LEG={both:`<span><i style="background:#eef6ff"></i>Both networks</span><span><i style="background:var(--a2g)"></i>A2G full plan only</span><span><i style="background:var(--leo)"></i>Starlink only</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>Neither</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G plan + 150 km</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span>`,
-  a2g:`<span><i style="background:var(--a2g)"></i>A2G full plan covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No A2G</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G plan + 150 km</span>`,
-  leo:`<span><i style="background:var(--leo)"></i>Starlink covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No Starlink</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span>`};
+const LEG={both:`<span><i style="background:#eef6ff"></i>Both networks</span><span><i style="background:var(--a2g)"></i>A2G full plan only</span><span><i style="background:var(--leo)"></i>Starlink only</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>Neither</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G live</span><span><i class="sq" style="background:rgba(140,215,245,.45)"></i>A2G future</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span><span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>`,
+  a2g:`<span><i style="background:var(--a2g)"></i>A2G full plan covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No A2G</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G plan + 150 km</span><span><i class="sq" style="background:rgba(140,215,245,.45)"></i>A2G future</span>`,
+  leo:`<span><i style="background:var(--leo)"></i>Starlink covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No Starlink</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span><span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>`};
 function setLayer(l){ layer=l; document.querySelectorAll('.layers button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.l===l));
   document.querySelector('.hero').classList.toggle('split',split()); $('pane2').hidden=!split(); $('tag1').hidden=!split();
   $('leg1').innerHTML=LEG[layer1()]; $('vs').textContent=split()?'Show combined map':'Starlink map vs A2G map'; drawGlobe(); }
@@ -337,23 +346,32 @@ function relabel(){ const w=document.createTreeWalker(document.querySelector('.w
 document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.basis-t button').forEach(x=>x.setAttribute('aria-pressed',x===b)); SKYCOV.set({mode:b.dataset.m});
   $('msg').textContent=b.dataset.m==='now'?'Showing current A2G: the network live today (KSA and 44 European countries) with 150 km reach.':'Showing the A2G full roll-out plan with 150 km reach.'; renderAll(); });
 // ---------- smart controls: A2G countries in the calculation, Starlink coming-soon countries
-const OFFKEY='skyfive-cov-off', CSKEY='skyfive-cov-cs';
-try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=localStorage.getItem(CSKEY)==='1'; SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs}); }catch(e){}
-const csList=SKYCOV.csAdded();
-$('cs').title='Adds the countries Starlink lists as coming soon, pending approval or unknown: '+csList.join(', ')+'. Always excluded: India, Turkey, China, Egypt.';
-function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.length-off.size;
-  $('ctyN').textContent=n+'/'+D.units.length; $('ctyBtn').classList.toggle('off',off.size>0); $('cs').setAttribute('aria-pressed',st.cs);
+const OFFKEY='skyfive-cov-off', CSKEY='skyfive-cov-csset';
+try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=JSON.parse(localStorage.getItem(CSKEY)||'[]'); SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs:cs.filter(n=>SKYCOV.csAdded().includes(n))}); }catch(e){}
+const CSG=SKYCOV.csGroups(), CSALL=SKYCOV.csAdded(), GLAB={pending_regulatory:'Pending regulatory approval',coming_soon:'Coming soon',unknown:'Status unknown'};
+const closeDD=()=>{ ['ctyPan','csPan'].forEach(id=>$(id).hidden=true); $('ctyBtn').setAttribute('aria-expanded',false); $('cs').setAttribute('aria-expanded',false); };
+function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.length-off.size, cs=new Set(st.cs);
+  $('ctyN').textContent=n+'/'+D.units.length; $('ctyBtn').classList.toggle('off',off.size>0);
+  $('csN').textContent=cs.size?cs.size+(cs.has('Saudi Arabia')?' incl. KSA':''):''; $('cs').setAttribute('aria-pressed',cs.size>0);
   $('ctyPan').innerHTML=`<div class="q"><button type="button" data-q="all">All</button><button type="button" data-q="live">Live today only</button><button type="button" data-q="none">None</button></div>`+
     D.tiers.map((t,ti)=>{ const us=D.units.filter(u=>u.tier===ti); if(!us.length) return ''; return `<h4>${t}</h4><div class="g">`+us.map(u=>`<label><input type="checkbox" data-u="${u.id}" ${off.has(u.id)?'':'checked'}>${u.name}${u.n>1?` <small>(${u.n})</small>`:''}</label>`).join('')+'</div>'; }).join('')+
     `<p class="basis" style="margin:10px 0 0">Unticked countries no longer count for A2G anywhere: scores, map, recommendation and PPT. Europe counts as one block.</p>`;
-  $('ctyPan').querySelectorAll('input').forEach(i=>i.onchange=()=>{ const o=new Set(SKYCOV.state().off); i.checked?o.delete(i.dataset.u):o.add(i.dataset.u); applyState({off:[...o]}); });
-  $('ctyPan').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{ const q=b.dataset.q; applyState({off:q==='all'?[]:q==='none'?D.units.map(u=>u.id):D.units.filter(u=>u.tier!==0).map(u=>u.id)}); });
-  const notes=SKYCOV.note(); $('kState').textContent=notes.join(' · '); }
-function applyState(o){ SKYCOV.set(o); const st=SKYCOV.state(); try{ localStorage.setItem(OFFKEY,JSON.stringify(st.off)); localStorage.setItem(CSKEY,st.cs?'1':'0'); }catch(e){} renderAll(); }
-$('ctyBtn').onclick=e=>{ e.stopPropagation(); const open=$('ctyPan').hidden; $('ctyPan').hidden=!open; $('ctyBtn').setAttribute('aria-expanded',open); };
-document.addEventListener('click',e=>{ if(!$('ctyPan').hidden&&!e.target.closest('.ddw')){ $('ctyPan').hidden=true; $('ctyBtn').setAttribute('aria-expanded',false); } });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('ctyPan').hidden){ $('ctyPan').hidden=true; $('ctyBtn').setAttribute('aria-expanded',false); $('ctyBtn').focus(); } });
-$('cs').onclick=()=>{ const on=!SKYCOV.state().cs; applyState({cs:on}); $('msg').textContent=on?'Starlink now includes its coming-soon, pending and unknown countries ('+csList.length+'), except India, Turkey, China and Egypt.':'Starlink is back to countries marked Available today.'; };
+  $('ctyPan').querySelectorAll('input').forEach(i=>i.onchange=()=>{ const o=new Set(SKYCOV.state().off); i.checked?o.delete(i.dataset.u):o.add(i.dataset.u); applyState({off:[...o]},'ctyPan'); });
+  $('ctyPan').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{ const q=b.dataset.q; applyState({off:q==='all'?[]:q==='none'?D.units.map(u=>u.id):D.units.filter(u=>u.tier!==0).map(u=>u.id)},'ctyPan'); });
+  $('csPan').innerHTML=`<div class="q"><button type="button" data-c="ksa">KSA only</button><button type="button" data-c="pending">All pending approval</button><button type="button" data-c="all">All future</button><button type="button" data-c="none">None</button></div>`+
+    Object.entries(CSG).map(([k,list])=>list.length?`<h4>${GLAB[k]} · ${list.length}</h4><div class="g">`+list.map(n=>`<label class="${n==='Saudi Arabia'?'ksa':''}"><input type="checkbox" data-c="${n}" ${cs.has(n)?'checked':''}>${n==='Saudi Arabia'?'Saudi Arabia (KSA)':n}</label>`).join('')+'</div>':'').join('')+
+    `<h4>Always excluded</h4><div class="g">`+[...SKYCOV.CS_NEVER].map(n=>`<label class="never"><input type="checkbox" disabled>${n}</label>`).join('')+`</div>`+
+    `<p class="basis" style="margin:10px 0 0">Ticked countries count as Starlink-covered and show in a lighter amber on the map.</p>`;
+  $('csPan').querySelectorAll('input[data-c]').forEach(i=>i.onchange=()=>{ const o=new Set(SKYCOV.state().cs); i.checked?o.add(i.dataset.c):o.delete(i.dataset.c); applyState({cs:[...o]},'csPan'); });
+  $('csPan').querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{ const q=b.dataset.c; applyState({cs:q==='ksa'?['Saudi Arabia']:q==='pending'?CSG.pending_regulatory:q==='all'?CSALL:[]},'csPan'); });
+  $('kState').textContent=SKYCOV.note().join(' · '); }
+function applyState(o,keep){ SKYCOV.set(o); const st=SKYCOV.state(); try{ localStorage.setItem(OFFKEY,JSON.stringify(st.off)); localStorage.setItem(CSKEY,JSON.stringify(st.cs)); }catch(e){} renderAll(); if(keep){ $(keep).hidden=false; } }
+function toggleDD(btn,pan){ const open=$(pan).hidden; closeDD(); $(pan).hidden=!open; $(btn).setAttribute('aria-expanded',open); }
+$('ctyBtn').onclick=e=>{ e.stopPropagation(); toggleDD('ctyBtn','ctyPan'); };
+$('cs').onclick=e=>{ e.stopPropagation(); toggleDD('cs','csPan'); };
+['ctyPan','csPan'].forEach(id=>$(id).addEventListener('click',e=>e.stopPropagation()));
+document.addEventListener('click',e=>{ if(!e.target.closest('.ddw')) closeDD(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDD(); });
 function renderAll(){ ctyRender(); chips(); fillAdd(); renderCmp(); renderAirline(); speedLink(); drawGlobe(); relabel(); }
 // ---------- CSV upload: score actual tracks in the browser on a 0.2° grid (country + A2G 150 km reach)
 const GR=window.COVGRID; let GC=null,GM=null;
