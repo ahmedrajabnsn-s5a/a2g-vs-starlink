@@ -1,8 +1,8 @@
 /* SKYCSV: reads airline track CSVs into clean flights [{o,d,pts:[[lon,lat],...]}].
    Format A (Oman style): Timestamp, Callsign, Position "lat,lon" (or Latitude/Longitude), Terminal (origin), destination.
-   Format B (flynas style): one route per "City most pair" code (e.g. CAI-JED), lat, long, no times; optional
+   Format B (flynas / Routes_update style): one route per "City most pair" / "most city pair" code (e.g. CAI-JED), lat, long, no times; optional
    airline flag columns (e.g. "flynas" = FLYNAS / #N/A, "Aircairo" = Air Cairo). Rows with no flag belong to the
-   airline named in the file name. Works in the browser (window.SKYCSV) and in Node (module.exports). */
+   airline named in the file name. An "Airline" column (e.g. flynas) picks the rows for the selected airline. Works in the browser (window.SKYCSV) and in Node (module.exports). */
 (function(root){
 const R=Math.PI/180;
 const hav=(a,b)=>{const dl=(b[1]-a[1])*R,dn=(b[0]-a[0])*R,x=Math.sin(dl/2)**2+Math.cos(a[1]*R)*Math.cos(b[1]*R)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
@@ -26,7 +26,7 @@ function parse(text,opt){ opt=opt||{}; const air=opt.airline||{}, hubs=air.hubs|
   const col=(...ks)=>H.findIndex(h=>ks.some(k=>h===k)), colIn=(...ks)=>H.findIndex(h=>ks.some(k=>h.includes(k)));
   const iP=colIn('position'), iLa=col('lat','latitude')>=0?col('lat','latitude'):colIn('latitude'), iLo=col('long','lon','lng','longitude')>=0?col('long','lon','lng','longitude'):colIn('longitude');
   const iT=col('timestamp','time','utc')>=0?col('timestamp','time','utc'):colIn('timestamp');
-  const iPair=colIn('city most pair','route','iata pair','od pair'), iC=colIn('callsign','flight no'), iO=colIn('terminal','terimnal','origin','dep'), iD=colIn('destination','dest','arr');
+  const iPair=(()=>{ for(const k of ['city most pair','most city pair','most pair','iata pair','od pair','city pair','citypair','route']){ const i=H.findIndex(h=>h.includes(k)); if(i>=0) return i; } return -1; })(), iC=colIn('callsign','flight no'), iO=colIn('terminal','terimnal','origin','dep'), iD=colIn('destination','dest','arr');
   if(iP<0&&(iLa<0||iLo<0)) throw new Error('No position column found. Use Position "lat,lon", or lat and long columns.');
   const rows=lines.slice(1).map(splitCSV);
   const pos=v=>{ let lat,lon; if(iP>=0){ const m=(v[iP]||'').split(/[ ,;]+/).map(Number); lat=m[0]; lon=m[1]; } else { lat=parseFloat(v[iLa]); lon=parseFloat(v[iLo]); } return isFinite(lat)&&isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180?[lon,lat]:null; };
@@ -36,10 +36,12 @@ function parse(text,opt){ opt=opt||{}; const air=opt.airline||{}, hubs=air.hubs|
   if(iPair>=0&&!hasTime){
     // ---- Format B: route codes, ordered points
     info.format='route points';
-    const flagCols=H.map((h,i)=>i).filter(i=>i!==iPair&&rows.some(v=>/^(#n\/a|[a-z ]{3,})$/i.test(v[i]||''))&&rows.filter(v=>(v[i]||'')&&!/^#n\/a$/i.test(v[i])).length>0&&H[i]&&!/city|pair|carrier|lat|lon|time|alt|cov|dep|arr/.test(H[i]));
+    const iAir=H.findIndex(h=>/^(airline|airline name|carrier|carrier name|operator)$/.test(h.replace(/[^a-z ]/g,'').trim()));
+    const flagCols=H.map((h,i)=>i).filter(i=>i!==iPair&&i!==iAir&&rows.some(v=>/^(#n\/a|[a-z ]{3,})$/i.test(v[i]||''))&&rows.filter(v=>(v[i]||'')&&!/^#n\/a$/i.test(v[i])).length>0&&H[i]&&!/city|pair|carrier|airline|lat|lon|time|alt|cov|dep|arr|domestic|international/.test(H[i]));
     const me=norm(air.name), myCol=flagCols.find(i=>me&&(norm(H[i])===me||norm(H[i]).includes(me)||me.includes(norm(H[i]))));
     const named=fname&&me&&fname.includes(me);
-    const mine=v=>{ if(myCol!=null){ const x=(v[myCol]||'').trim(); if(x&&!/^#n\/a$/i.test(x)) return true; }
+    const mine=v=>{ if(iAir>=0){ const x=norm(v[iAir]); if(x) return !!me&&(x===me||x.includes(me)||me.includes(x)); }
+      if(myCol!=null){ const x=(v[myCol]||'').trim(); if(x&&!/^#n\/a$/i.test(x)) return true; }
       const anyFlag=flagCols.some(i=>(v[i]||'').trim()); return !anyFlag&&(named||myCol==null); };
     const groups=new Map();
     for(const v of rows){ const code=(v[iPair]||'').toUpperCase().replace(/\s+/g,''); const p=pos(v); if(!code||!p) continue; if(!mine(v)){ info.otherAirline++; continue; }
