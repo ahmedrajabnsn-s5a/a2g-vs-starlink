@@ -31,7 +31,7 @@ function build(r){ const ev=r.routes.map(x=>evalPts(x.pts)); let W=0,A=0,S=0; co
   if(r.calcs&&r.markets){ const it=r.calcs.map(c=>{ const e=c.ri!=null?ev[c.ri]:evalPts(c.pts); return {m:c.m,w:c.w,a:e.a,s:e.s}; });
     markets=r.markets.map(m=>{ const L=it.filter(x=>x.m===m.k), w=L.reduce((t,x)=>t+x.w,0)||1; return {label:m.label,share:m.share,n:L.length,a:L.reduce((t,x)=>t+x.w*x.a,0)/w*100,s:L.reduce((t,x)=>t+x.w*x.s,0)/w*100}; }).filter(m=>m.n);
     const Sh=markets.reduce((t,m)=>t+m.share,0)||1; tw={a:markets.reduce((t,m)=>t+m.share*m.a,0)/Sh,s:markets.reduce((t,m)=>t+m.share*m.s,0)/Sh,flights:r.flights}; }
-  return {name:r.name,iata:r.iata,icao:r.icao,cc:r.cc,hub:r.hub,hubs:r.hubs,fleet:r.fleet,uploaded:r.uploaded||null,
+  return {name:r.name,iata:r.iata,icao:r.icao,cc:r.cc,hub:r.hub,hubs:r.hubs,fleet:r.fleet,uploaded:r.uploaded||null,csv:r.routes.some(x=>x.src==='csv'),
     net:{a:A/W*100,s:S/W*100,routes:r.routes.length},tw,markets,gapsA:top(GA),gapsS:top(GS),
     routes:r.routes.map((x,i)=>({o:x.o,d:x.d,km:x.km,src:x.src,seats:x.seats||null,flights:x.flights||null,a:Math.round(ev[i].a*100),s:Math.round(ev[i].s*100),pts:ev[i].fl}))}; }
 function recompute(){ window.SKYMODE=ST.mode; ACT=activeMask(); OKC=D.cnames.map(c=>slOk(c.n,c.st));
@@ -50,7 +50,7 @@ function note(){ const L=[]; if(ST.off.size) L.push('A2G excludes: '+D.units.fil
 recompute();
 // Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
 function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};
-  const useTw=a.tw&&a.tw.flights>=50; return useTw?{a:a.tw.a,s:a.tw.s,basis:'traffic-weighted (FR24, '+a.tw.flights+' flights)'}:{a:a.net.a,s:a.net.s,basis:'all '+a.net.routes+' routes, by distance'+(a.name==='Oman Air'?' (actual tracks)':'')}; }
+  const useTw=a.tw&&a.tw.flights>=50; return useTw?{a:a.tw.a,s:a.tw.s,basis:'traffic-weighted (FR24, '+a.tw.flights+' flights)'+(a.csv?', actual tracks':'')}:{a:a.net.a,s:a.net.s,basis:'all '+a.net.routes+' routes, by distance'+(a.csv?' (actual tracks)':'')}; }
 const pct=v=>Math.round(v)+'%';
 const TIE=3; // points: within this, coverage counts as level
 const WHY='A2G gives each aircraft a dedicated 108 Mbps site (no sharing), with better upload and lower latency';

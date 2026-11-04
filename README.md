@@ -14,10 +14,11 @@ Recommendation rule: when coverage is within 3 points, A2G is recommended (dedic
 - **Map shading**: live A2G and available Starlink countries in full colour; A2G future-plan countries and chosen Starlink future countries in a lighter shade.
 - **A2G full plan / Current A2G**: full roll-out plan or the network live today (KSA + 44 European countries).
 - **Export PPT**: choose the map style for the slides, flat map or 3D globe (falls back to flat if the device can't draw 3D).
+- **Upload CSV**: reads the Oman format (Timestamp, Callsign, Position, Terminal, destination) and the flynas format (City most pair, lat, long, airline flag columns such as flynas / Aircairo). Tracks are trimmed to their airports; rows tagged for another airline are skipped. Drop a CSV anywhere on the page.
 
 ## Data
 - Starlink status: starlink.com/map availability feed, 3 Nov 2026. Starlink's map shows consumer service; airlines also need each state's authorisation, so Starlink figures are a best case.
-- Routes and FR24 traffic sample (21 Sep – 6 Oct 2026): SKYFive A2G Coverage Globe. Oman Air: actual FR24 tracks from Muscat (44 flights).
+- Routes and FR24 traffic sample (21 Sep – 6 Oct 2026): SKYFive A2G Coverage Globe. Oman Air: actual FR24 tracks from Muscat (44 flights). flynas: actual tracks for 65 routes (Saudi domestic plus Egypt).
 - Speed assumptions (editable on the page): A2G 108/36 Mbps, 30 ms; Starlink beam 1,200/200 Mbps shared, 44 ms (Ookla Q1 2025 in-flight median).
 
 ## Run
