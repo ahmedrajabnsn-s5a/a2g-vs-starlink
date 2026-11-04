@@ -14,7 +14,7 @@ const RAWA=D.airlines, RAWC=D.countries; D.airlines={}; D.rawCountries=RAWC;
 const ST={mode:'plan',off:new Set(),cs:new Set()}; // cs = Starlink future countries counted as available
 const SLOK=new Set(['launched','available']), CS_OK=new Set(['coming_soon','pending_regulatory','unknown']);
 const CS_NEVER=new Set(['India','Turkey','China','Egypt']);
-function slOk(n,st){ if(st==='sea') return true; if(SLOK.has(st)) return true; return ST.cs.has(n)&&!CS_NEVER.has(n); }
+function slOk(n,st){ if(st==='sea') return true; if(SLOK.has(st)) return true; return ST.cs.has(n); }
 function activeMask(){ let m=0; D.units.forEach((u,i)=>{ if(ST.off.has(u.id)) return; if(ST.mode==='now'&&u.tier!==0) return; m|=(1<<i); }); return m>>>0; }
 const hav=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
 let OKC=[], ACT=0;
@@ -46,7 +46,7 @@ function csAdded(){ return Object.entries(RAWC).filter(([n,c])=>CS_OK.has(c.st)&
 function csGroups(){ const all=Object.entries(RAWC).filter(([n,c])=>CS_OK.has(c.st)&&!CS_NEVER.has(n)); const g={pending_regulatory:[],coming_soon:[],unknown:[]};
   all.forEach(([n,c])=>g[c.st].push(n)); for(const k in g) g[k].sort((a,b)=>a==='Saudi Arabia'?-1:b==='Saudi Arabia'?1:a.localeCompare(b)); return g; }
 function note(){ const L=[]; if(ST.off.size) L.push('A2G excludes: '+D.units.filter(u=>ST.off.has(u.id)).map(u=>u.name).join(', '));
-  if(ST.cs.size) L.push('Starlink future countries added: '+(ST.cs.size>8?ST.cs.size+' countries'+(ST.cs.has('Saudi Arabia')?' incl. Saudi Arabia':''):[...ST.cs].sort().join(', '))+' (never India, Turkey, China, Egypt)'); return L; }
+  if(ST.cs.size) L.push('Starlink future countries added: '+(ST.cs.size>8?ST.cs.size+' countries'+(ST.cs.has('Saudi Arabia')?' incl. Saudi Arabia':''):[...ST.cs].sort().join(', '))+([...CS_NEVER].some(n=>ST.cs.has(n))?' (includes normally excluded: '+[...CS_NEVER].filter(n=>ST.cs.has(n)).join(', ')+')':'')); return L; }
 recompute();
 // Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
 function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};

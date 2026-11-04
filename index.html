@@ -67,7 +67,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .dd label:hover{background:rgba(255,255,255,.04)}
 .dd input{accent-color:var(--a2g);width:16px;height:16px}
 #csPan input{accent-color:#ff9d45}
-#csPan label.never{opacity:.5;cursor:not-allowed}
+#csPan label.never{color:var(--mute)} #csPan label.never:has(input:checked){color:#ffcf5c}
 #csPan label.ksa{font-weight:600}
 .dd small{color:var(--mute)}
 .state{font-size:12.5px;color:#ffcf5c}
@@ -347,7 +347,7 @@ document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ document
   $('msg').textContent=b.dataset.m==='now'?'Showing current A2G: the network live today (KSA and 44 European countries) with 150 km reach.':'Showing the A2G full roll-out plan with 150 km reach.'; renderAll(); });
 // ---------- smart controls: A2G countries in the calculation, Starlink coming-soon countries
 const OFFKEY='skyfive-cov-off', CSKEY='skyfive-cov-csset';
-try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=JSON.parse(localStorage.getItem(CSKEY)||'[]'); SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs:cs.filter(n=>SKYCOV.csAdded().includes(n))}); }catch(e){}
+try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=JSON.parse(localStorage.getItem(CSKEY)||'[]'); SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs:cs.filter(n=>SKYCOV.csAdded().includes(n)||SKYCOV.CS_NEVER.has(n))}); }catch(e){}
 const CSG=SKYCOV.csGroups(), CSALL=SKYCOV.csAdded(), GLAB={pending_regulatory:'Pending regulatory approval',coming_soon:'Coming soon',unknown:'Status unknown'};
 const closeDD=()=>{ ['ctyPan','csPan'].forEach(id=>$(id).hidden=true); $('ctyBtn').setAttribute('aria-expanded',false); $('cs').setAttribute('aria-expanded',false); };
 function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.length-off.size, cs=new Set(st.cs);
@@ -360,8 +360,8 @@ function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.le
   $('ctyPan').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{ const q=b.dataset.q; applyState({off:q==='all'?[]:q==='none'?D.units.map(u=>u.id):D.units.filter(u=>u.tier!==0).map(u=>u.id)},'ctyPan'); });
   $('csPan').innerHTML=`<div class="q"><button type="button" data-c="ksa">KSA only</button><button type="button" data-c="pending">All pending approval</button><button type="button" data-c="all">All future</button><button type="button" data-c="none">None</button></div>`+
     Object.entries(CSG).map(([k,list])=>list.length?`<h4>${GLAB[k]} · ${list.length}</h4><div class="g">`+list.map(n=>`<label class="${n==='Saudi Arabia'?'ksa':''}"><input type="checkbox" data-c="${n}" ${cs.has(n)?'checked':''}>${n==='Saudi Arabia'?'Saudi Arabia (KSA)':n}</label>`).join('')+'</div>':'').join('')+
-    `<h4>Always excluded</h4><div class="g">`+[...SKYCOV.CS_NEVER].map(n=>`<label class="never"><input type="checkbox" disabled>${n}</label>`).join('')+`</div>`+
-    `<p class="basis" style="margin:10px 0 0">Ticked countries count as Starlink-covered and show in a lighter amber on the map.</p>`;
+    `<h4>Excluded by default · tick to open</h4><div class="g">`+[...SKYCOV.CS_NEVER].map(n=>`<label class="never"><input type="checkbox" data-c="${n}" ${cs.has(n)?'checked':''}>${n} <small>${({India:'pending',Turkey:'pending',China:'not available',Egypt:'unknown'})[n]}</small></label>`).join('')+`</div>`+
+    `<p class="basis" style="margin:10px 0 0">Ticked countries count as Starlink-covered and show in a lighter amber on the map. The shortcuts never tick the four excluded-by-default countries.</p>`;
   $('csPan').querySelectorAll('input[data-c]').forEach(i=>i.onchange=()=>{ const o=new Set(SKYCOV.state().cs); i.checked?o.add(i.dataset.c):o.delete(i.dataset.c); applyState({cs:[...o]},'csPan'); });
   $('csPan').querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>{ const q=b.dataset.c; applyState({cs:q==='ksa'?['Saudi Arabia']:q==='pending'?CSG.pending_regulatory:q==='all'?CSALL:[]},'csPan'); });
   $('kState').textContent=SKYCOV.note().join(' · '); }
