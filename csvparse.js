@@ -11,7 +11,7 @@ function interp(a,b,t){ // great-circle point between a and b
   const A=Math.sin((1-t)*d)/Math.sin(d),B=Math.sin(t*d)/Math.sin(d); const x=A*Math.cos(p1)*Math.cos(l1)+B*Math.cos(p2)*Math.cos(l2),y=A*Math.cos(p1)*Math.sin(l1)+B*Math.cos(p2)*Math.sin(l2),z=A*Math.sin(p1)+B*Math.sin(p2);
   return [Math.atan2(y,x)/R,Math.atan2(z,Math.sqrt(x*x+y*y))/R]; }
 function densify(P,step){ const o=[P[0]]; for(let i=1;i<P.length;i++){ const L=hav(P[i-1],P[i]); if(L>step*1.5){ const n=Math.ceil(L/step); for(let k=1;k<n;k++) o.push(interp(P[i-1],P[i],k/n)); } o.push(P[i]); } return o; }
-function splitCSV(line){ const o=[];let cur='',q=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch==='"'){q=!q;continue;} if(ch===','&&!q){o.push(cur);cur='';continue;} cur+=ch;} o.push(cur); return o.map(v=>v.replace(/[ ÊÂ�]/g,' ').trim()); }
+function splitCSV(line){ const o=[];let cur='',q=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch==='"'){q=!q;continue;} if(ch===','&&!q){o.push(cur);cur='';continue;} cur+=ch;} o.push(cur); return o.map(v=>v.replace(/[\u00a0\u00ca\u00c2\ufffd]/g,' ').trim()); }
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 // keep the part of a track between the points nearest each airport; patch the ends with great-circle legs
 function trimTo(P,A,B){ if(!A&&!B) return P; let ia=0,ib=P.length-1;
@@ -21,7 +21,7 @@ function trimTo(P,A,B){ if(!A&&!B) return P; let ia=0,ib=P.length-1;
   if(A&&hav(Q[0],A)>5) Q=[A,...Q]; if(B&&hav(Q[Q.length-1],B)>5) Q=[...Q,B]; return Q; }
 function clean(P){ const Q=[P[0]]; for(const p of P){ if(hav(Q[Q.length-1],p)>=3) Q.push(p); } return Q; }
 function parse(text,opt){ opt=opt||{}; const air=opt.airline||{}, hubs=air.hubs||[], hub=air.hub||hubs[0], AP=opt.airports||{}, fname=norm(opt.filename);
-  const lines=text.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim()); if(lines.length<3) throw new Error('The file has no track rows.');
+  const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim()); if(lines.length<3) throw new Error('The file has no track rows.');
   const Hraw=splitCSV(lines[0]), H=Hraw.map(h=>h.toLowerCase().trim());
   const col=(...ks)=>H.findIndex(h=>ks.some(k=>h===k)), colIn=(...ks)=>H.findIndex(h=>ks.some(k=>h.includes(k)));
   const iP=colIn('position'), iLa=col('lat','latitude')>=0?col('lat','latitude'):colIn('latitude'), iLo=col('long','lon','lng','longitude')>=0?col('long','lon','lng','longitude'):colIn('longitude');
