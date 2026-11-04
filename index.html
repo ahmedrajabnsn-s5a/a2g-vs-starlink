@@ -7,6 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+[hidden]{display:none!important}
 /* Layout: airline chips + picker on top, the 3D coverage globe as the hero with the scorecard beside it, then the airline comparison, gaps, markets and routes. Single dark look (matches the A2G Coverage Globe). */
 :root{
   --bg:#030916; --panel:#0a1a30; --panel-2:#10243f; --line:#1f3758; --ink:#e9f2fb; --mute:#8ea6c2;
@@ -155,7 +156,11 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
     <label for="add" class="sr">Add an airline</label>
     <select id="add" title="Add an airline"></select>
     <label class="ghost up-b" for="csv" id="up" title="Upload actual flight tracks for the active airline. Reads the Oman format (Timestamp, Callsign, Position, Terminal, destination) , the flynas format (City most pair, lat, long, airline flag columns) and the Routes format (most city pair, Lat, Long, Domestic | International, Airline). You can also drop a CSV anywhere on the page.">⬆ Upload CSV · <b id="upName">Oman Air</b></label><input type="file" id="csv" accept=".csv,text/csv" hidden>
-    <button type="button" class="ghost" id="revert" hidden>Use built-in routes</button>
+    <button type="button" class="ghost" id="revert" hidden title="Remove the uploaded CSV and go back to the built-in routes">✕ Remove uploaded CSV</button>
+    <div class="toggle" id="srcT" role="group" aria-label="Route source" hidden title="Which built-in routes to use for this airline">
+      <button type="button" data-src="fr24" aria-pressed="true">FlightRadar24</button>
+      <button type="button" data-src="csv" aria-pressed="false">CSV tracks</button>
+    </div>
   </div>
   <div class="bar">
     <div class="toggle" role="group" aria-label="Routes on the globe">
@@ -332,14 +337,14 @@ function renderAirline(){
   const aw=a.routes.filter(r=>r.a-r.s>SKYCOV.TIE).length,lw=a.routes.filter(r=>r.s-r.a>SKYCOV.TIE).length,d=Math.round(h.a-h.s);
   const ga=a.gapsA[0],gs=a.gapsS[0];
   const rc=SKYCOV.rec(a); $('rec').className='rec'+(rc.pick==='A2G'?'':' l'); $('rec').innerHTML=`<b style="color:${rc.pick==='A2G'?'var(--a2g)':'var(--leo)'}">RECOMMEND ${rc.pick.toUpperCase()}</b><br>${rc.text}`;
-  $('upName').textContent=a.name; $('revert').hidden=!a.uploaded;
+  $('upName').textContent=a.name; $('revert').hidden=!a.uploaded; srcUI();
   $('verdict').innerHTML=(Math.abs(d)<=SKYCOV.TIE?`Coverage is level (within ${SKYCOV.TIE} points).`:d>=0?`The <b style="color:var(--a2g)">A2G full plan leads by ${d} points</b>.`:`<b style="color:var(--leo)">Starlink leads by ${-d} points</b>.`)+` Route by route, A2G covers more on ${aw}, Starlink on ${lw}, and ${a.routes.length-aw-lw} are level (A2G recommended there).`+(ga?` A2G’s biggest gap: ${ga[0].toLowerCase()} (${ga[1]}% of route distance).`:'')+(gs?` Starlink’s: ${gs[0]} (${gs[1]}%), not Available on its map.`:'');
   const bars=arr=>{if(!arr.length)return '<p class="basis">No material gap.</p>';const mx=Math.max(...arr.map(g=>g[1]),1);return arr.map(g=>`<div class="br"><span>${g[0]}</span><i style="width:${g[1]/mx*100}%"></i><span>${g[1]}%</span></div>`).join('');};
   $('gA').innerHTML=bars(a.gapsA);$('gL').innerHTML=bars(a.gapsS);
   $('mk').innerHTML=a.markets&&a.markets.length?'<tr><th>Market</th><th>Traffic</th><th>A2G</th><th>Starlink</th></tr>'+a.markets.map(m=>`<tr><td>${m.label}</td><td>${pct(m.share)}</td><td class="a">${m.a>=m.s?'<b>':''}${pct(m.a)}${m.a>=m.s?'</b>':''}</td><td class="l">${m.s>m.a?'<b>':''}${pct(m.s)}${m.s>m.a?'</b>':''}</td></tr>`).join(''):'<tr><td class="basis" style="white-space:normal">No FR24 traffic sample for this airline yet. The headline uses all routes by distance.</td></tr>';
   const val=(r,k)=>k==='route'?r.o+r.d:(r[k]==null?-1:r[k]);
   const rs=[...a.routes].sort((x,y)=>(val(x,sortK)>val(y,sortK)?1:val(x,sortK)<val(y,sortK)?-1:0)*sortDir);
-  $('rc').textContent='· '+a.routes.length+(a.name==='Oman Air'?' actual tracks':' routes')+' · click a heading to sort';
+  $('rc').textContent='· '+a.routes.length+(a.uploaded?' uploaded tracks':a.csv?' actual tracks (CSV)':' routes (FlightRadar24)')+' · click a heading to sort';
   const H=[['route','Route'],['km','Km'],['seats','FR24 seats'],['a','A2G plan'],['s','Starlink'],['w','Leader']];
   $('rt').innerHTML='<tr>'+H.map(([k,t])=>`<th data-k="${k}" scope="col">${t}${sortK===k?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>'+rs.map(r=>{const lead=Math.abs(r.a-r.s)<=SKYCOV.TIE?'<span class="pill a" title="Coverage level: A2G has the better upload and latency">A2G · level</span>':r.a>r.s?'<span class="pill a">A2G</span>':'<span class="pill l">Starlink</span>';
     return `<tr><td>${r.o}–${r.d}</td><td>${r.km.toLocaleString('en-US')}</td><td>${r.seats?r.seats.toLocaleString('en-US'):'–'}</td><td class="a">${r.a}%<span class="mini" style="--c:var(--a2g)"><i style="width:${r.a}%"></i></span></td><td class="l">${r.s}%<span class="mini" style="--c:var(--leo)"><i style="width:${r.s}%"></i></span></td><td>${lead}</td></tr>`;}).join('');
@@ -414,6 +419,12 @@ function parseTracks(text,airline,fname){
   return {name:airline.name,iata:airline.iata,icao:airline.icao,cc:airline.cc,hub:airline.hub,hubs:airline.hubs,fleet:airline.fleet,flights:airline.flights,markets:airline.markets,calcs:airline.calcs&&null,uploaded:{flights:nF,format:info.format,skipped:info.otherAirline},
     routes:[...routes.values()].map(r=>({o:r.o,d:r.d,km:Math.round(r.kmSum/r.flights),src:'upload',seats:null,flights:r.flights,pts:r.pts}))};
 }
+const BASE={}, SRC={}; const SRC_DEF=n=>n==='Oman Air'?'csv':'fr24';
+try{ Object.assign(SRC,JSON.parse(localStorage.getItem('skyfive-cov-src')||'{}')); }catch(e){}
+function applySrc(n,src,save){ if(!BASE[n]) BASE[n]=SKYCOV.getRaw(n); const b=BASE[n]; if(!b||!b.alt||!b.alt.csv) return;
+  SRC[n]=src; SKYCOV.setRaw(n, src==='csv'?Object.assign({},b.alt.csv,{alt:b.alt}):b);
+  if(save) try{ localStorage.setItem('skyfive-cov-src',JSON.stringify(SRC)); }catch(e){} }
+Object.keys(D.airlines).forEach(n=>{ const b=SKYCOV.getRaw(n); if(b&&b.alt&&b.alt.csv) applySrc(n,SRC[n]||SRC_DEF(n),false); });
 const ORIG={}; const upKey=n=>'skyfive-cov-upload3-'+n;
 function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=SKYCOV.getRaw(n); SKYCOV.setRaw(n,obj); }
 // restore uploads saved in this browser
@@ -428,7 +439,12 @@ $('csv').onchange=e=>{ handleFile(e.target.files[0]); e.target.value=''; };
 ['dragenter','dragover'].forEach(t=>document.addEventListener(t,e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){ e.preventDefault(); document.body.classList.add('dropping'); } }));
 ['dragleave','drop'].forEach(t=>document.addEventListener(t,e=>{ if(t==='dragleave'&&e.relatedTarget) return; e.preventDefault(); document.body.classList.remove('dropping'); }));
 document.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f) handleFile(f); });
-$('revert').onclick=()=>{ const n=active; if(ORIG[n]){ SKYCOV.setRaw(n,ORIG[n]); delete ORIG[n]; } try{localStorage.removeItem(upKey(n))}catch(e){} $('msg').textContent=n+': back to the built-in routes.'; renderAll(); };
+function removeUpload(n){ if(ORIG[n]){ SKYCOV.setRaw(n,ORIG[n]); delete ORIG[n]; } try{localStorage.removeItem(upKey(n))}catch(e){} }
+$('revert').onclick=()=>{ const n=active; removeUpload(n); $('msg').textContent=n+': uploaded CSV removed, back to the built-in '+(SRC[n]==='csv'?'CSV tracks':'FlightRadar24 routes')+'.'; renderAll(); };
+// built-in route source per airline: FlightRadar24 routes or the CSV actual tracks we baked in
+function srcUI(){ const n=active, b=BASE[n]||SKYCOV.getRaw(n), has=!!(b&&b.alt&&b.alt.csv); $('srcT').hidden=!has; if(!has) return;
+  const cur=SRC[n]||SRC_DEF(n); $('srcT').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.src===cur&&!D.airlines[n].uploaded)); }
+$('srcT').querySelectorAll('button').forEach(x=>x.onclick=()=>{ const n=active; removeUpload(n); applySrc(n,x.dataset.src,true); $('msg').textContent=n+': using '+(x.dataset.src==='csv'?'the CSV actual tracks ('+D.airlines[n].routes.length+' routes)':'FlightRadar24 routes ('+D.airlines[n].routes.length+' routes)')+'.'; renderAll(); });
 renderAll();
 // PPT export
 // Export button stays visible; save() waits for the viewer and explains if downloads are blocked here.
@@ -444,6 +460,3 @@ $('ppt').onclick=async()=>{ const b=$('ppt');b.disabled=true;$('msg').textConten
   b.disabled=false; };
 })();
 </script>
-
-</body>
-</html>
