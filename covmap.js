@@ -9,13 +9,43 @@ const SWAPS=[[/a country in the SKYFive A2G plan \(KSA, Europe, India, Oman, Tur
   [/A2G FULL PLAN/g,'A2G TODAY'],[/A2G full plan/g,'A2G today'],[/A2G full-plan/g,'A2G today'],[/A2G plan/g,'A2G today'],[/the full A2G plan/g,'A2G today'],[/full plan/g,'today']];
 function T(str){ if(window.SKYMODE!=='now'||typeof str!=='string') return str; for(const [a,b] of SWAPS) str=str.replace(a,b); return str; }
 function deepT(v){ if(typeof v==='string') return T(v); if(Array.isArray(v)) return v.map(deepT); if(v&&typeof v==='object'&&!(v instanceof Uint8Array)){ const o={}; for(const k in v) o[k]=(k==='data'||k==='path')?v[k]:deepT(v[k]); return o; } return v; }
-let RAW=null; const NOWC={};
-function raw(){ if(!RAW){ RAW={airlines:Object.assign({},D.airlines),countries:D.countries}; for(const n in D.countries) NOWC[n]={...D.countries[n],plan:D.countries[n].now||0}; } return RAW; }
-function view(a,m){ if(m!=='now'||a.an_missing) return a; return {...a,net:{...a.net,a:a.net.an},tw:a.tw?{...a.tw,a:a.tw.an}:null,markets:a.markets?a.markets.map(x=>({...x,a:x.an})):null,gapsA:a.gapsN||[],
-  routes:a.routes.map(r=>({...r,a:r.an,pts:r.pts.map(p=>[p[0],p[1],((p[2]&4)?1:0)|(p[2]&2)|(p[2]&4)])}))}; }
-function setMode(m){ window.SKYMODE=m; const R=raw(); for(const n in R.airlines) D.airlines[n]=view(R.airlines[n],m); D.countries=m==='now'?NOWC:R.countries; }
-function setRaw(n,a){ raw().airlines[n]=a; D.airlines[n]=view(a,window.SKYMODE); }
-function getRaw(n){ return raw().airlines[n]; }
+// ---------- live coverage engine: raw points [lon,lat,countryIdx,unitMask] -> coverage per airline
+const RAWA=D.airlines, RAWC=D.countries; D.airlines={}; D.rawCountries=RAWC;
+const ST={mode:'plan',off:new Set(),cs:false};
+const SLOK=new Set(['launched','available']), CS_OK=new Set(['coming_soon','pending_regulatory','unknown']);
+const CS_NEVER=new Set(['India','Turkey','China','Egypt']);
+function slOk(n,st){ if(st==='sea') return true; if(SLOK.has(st)) return true; return ST.cs&&CS_OK.has(st)&&!CS_NEVER.has(n); }
+function activeMask(){ let m=0; D.units.forEach((u,i)=>{ if(ST.off.has(u.id)) return; if(ST.mode==='now'&&u.tier!==0) return; m|=(1<<i); }); return m>>>0; }
+const hav=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
+let OKC=[], ACT=0;
+function evalPts(P){ let T=0,A=0,S=0; const ga={},gs={}; const fl=P.map(p=>[p[0],p[1],((p[3]&ACT)?1:0)|(OKC[p[2]]?2:0)]);
+  for(let i=0;i<P.length-1;i++){ const L=hav(P[i],P[i+1]); T+=L; const ca=(fl[i][2]&1)&&(fl[i+1][2]&1), cs=(fl[i][2]&2)&&(fl[i+1][2]&2);
+    if(ca) A+=L; else { const c=D.cnames[!(fl[i][2]&1)?P[i][2]:P[i+1][2]].n; ga[c]=(ga[c]||0)+L; }
+    if(cs) S+=L; else { const c=D.cnames[!(fl[i][2]&2)?P[i][2]:P[i+1][2]].n; gs[c]=(gs[c]||0)+L; } }
+  return {T,a:T?A/T:0,s:T?S/T:0,ga,gs,fl}; }
+function build(r){ const ev=r.routes.map(x=>evalPts(x.pts)); let W=0,A=0,S=0; const GA={},GS={};
+  ev.forEach((e,i)=>{ const w=(r.routes[i].km||e.T)*(r.routes[i].flights||1); W+=w; A+=w*e.a; S+=w*e.s;
+    const k=w/(e.T||1); for(const c in e.ga) GA[c]=(GA[c]||0)+e.ga[c]*k; for(const c in e.gs) GS[c]=(GS[c]||0)+e.gs[c]*k; });
+  W=W||1; const top=o=>Object.entries(o).map(([k,v])=>[k,+(v/W*100).toFixed(1)]).filter(x=>x[1]>=0.1).sort((x,y)=>y[1]-x[1]).slice(0,6);
+  let tw=null, markets=null;
+  if(r.calcs&&r.markets){ const it=r.calcs.map(c=>{ const e=c.ri!=null?ev[c.ri]:evalPts(c.pts); return {m:c.m,w:c.w,a:e.a,s:e.s}; });
+    markets=r.markets.map(m=>{ const L=it.filter(x=>x.m===m.k), w=L.reduce((t,x)=>t+x.w,0)||1; return {label:m.label,share:m.share,n:L.length,a:L.reduce((t,x)=>t+x.w*x.a,0)/w*100,s:L.reduce((t,x)=>t+x.w*x.s,0)/w*100}; }).filter(m=>m.n);
+    const Sh=markets.reduce((t,m)=>t+m.share,0)||1; tw={a:markets.reduce((t,m)=>t+m.share*m.a,0)/Sh,s:markets.reduce((t,m)=>t+m.share*m.s,0)/Sh,flights:r.flights}; }
+  return {name:r.name,iata:r.iata,icao:r.icao,cc:r.cc,hub:r.hub,hubs:r.hubs,fleet:r.fleet,uploaded:r.uploaded||null,
+    net:{a:A/W*100,s:S/W*100,routes:r.routes.length},tw,markets,gapsA:top(GA),gapsS:top(GS),
+    routes:r.routes.map((x,i)=>({o:x.o,d:x.d,km:x.km,src:x.src,seats:x.seats||null,flights:x.flights||null,a:Math.round(ev[i].a*100),s:Math.round(ev[i].s*100),pts:ev[i].fl}))}; }
+function recompute(){ window.SKYMODE=ST.mode; ACT=activeMask(); OKC=D.cnames.map(c=>slOk(c.n,c.st));
+  const C={}; for(const n in RAWC){ const c=RAWC[n]; C[n]={sl:slOk(n,c.st)?'available':'no',plan:c.unit>=0&&(ACT&(1<<c.unit))?1:0}; } D.countries=C;
+  for(const n in RAWA) D.airlines[n]=build(RAWA[n]);
+  window.SKYSTATE=ST.mode+'|'+[...ST.off].sort().join(',')+'|'+(ST.cs?1:0); }
+function set(o){ if(o.mode) ST.mode=o.mode; if(o.off) ST.off=new Set(o.off); if(o.cs!=null) ST.cs=!!o.cs; recompute(); }
+function setMode(m){ set({mode:m}); }
+function setRaw(n,a){ RAWA[n]=a; D.airlines[n]=build(a); }
+function getRaw(n){ return RAWA[n]; }
+function csAdded(){ return Object.entries(RAWC).filter(([n,c])=>CS_OK.has(c.st)&&!CS_NEVER.has(n)).map(([n])=>n).sort(); }
+function note(){ const L=[]; if(ST.off.size) L.push('A2G excludes: '+D.units.filter(u=>ST.off.has(u.id)).map(u=>u.name).join(', '));
+  if(ST.cs) L.push('Starlink includes its coming-soon, pending and unknown countries, except India, Turkey, China and Egypt'); return L; }
+recompute();
 // Headline basis: FR24 traffic weighting when the sample is big enough, else all routes by distance
 function head(a){ if(a.uploaded) return {a:a.net.a,s:a.net.s,basis:'your uploaded tracks: '+a.uploaded.flights+' flights, by distance'};
   const useTw=a.tw&&a.tw.flights>=50; return useTw?{a:a.tw.a,s:a.tw.s,basis:'traffic-weighted (FR24, '+a.tw.flights+' flights)'}:{a:a.net.a,s:a.net.s,basis:'all '+a.net.routes+' routes, by distance'+(a.name==='Oman Air'?' (actual tracks)':'')}; }
@@ -25,7 +55,7 @@ const WHY='A2G gives each aircraft a dedicated 108 Mbps site (no sharing), with 
 function rec(a){ const h=head(a), d=h.a-h.s;
   if(d>TIE) return {pick:'A2G',kind:'coverage',short:'A2G · better coverage',text:`Recommend A2G: it covers ${Math.round(d)} points more of the flight time. ${WHY}.`};
   if(d>=-TIE) return {pick:'A2G',kind:'tie',short:'A2G · coverage level, better speed',text:`Coverage is level (${pct(h.a)} vs ${pct(h.s)}), so recommend A2G: ${WHY}.`};
-  return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on today’s map. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
+  return {pick:'Starlink',kind:'coverage',short:'Starlink · covers more',text:`Starlink covers ${Math.round(-d)} points more of the flight time on ${ST.cs?'its map with coming-soon countries added':'today’s map'}. A2G still gives each aircraft dedicated capacity with better upload and latency where it covers.`}; }
 const P={navy:'0B1B2E',ink:'0B1B2E',mute:'5B6B80',light:'F3F6FA',a2g:'1C8FD6',leo:'E07B24',line:'D5DEE8',white:'FFFFFF'};
 const today=()=>new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
 function base(){ const p=new PptxGenJS(); const add=p.addSlide.bind(p);
@@ -46,7 +76,7 @@ function summary(p,names){ const s=p.addSlide({masterName:'LIGHT'});
   const rows=names.map(n=>{const a=D.airlines[n],h=head(a);return {n,a,h};});
   const lead=rows.filter(r=>r.h.a>r.h.s).length;
   const recs=rows.map(r=>rec(r.a)); const nA=recs.filter(x=>x.pick==='A2G').length;
-  title(s,nA===rows.length?'Recommend A2G for every airline selected':lead===rows.length?'The A2G full plan out-covers Starlink for every airline selected':lead+' of '+rows.length+' airlines are better covered by the A2G full plan','Share of flight time covered · A2G full plan with '+D.buffer_km+' km reach vs Starlink’s own availability map');
+  title(s,nA===rows.length?'Recommend A2G for every airline selected':lead===rows.length?'The A2G full plan out-covers Starlink for every airline selected':lead+' of '+rows.length+' airlines are better covered by the A2G full plan','Share of flight time covered · A2G full plan with '+D.buffer_km+' km reach vs Starlink’s own availability map'+(note().length?' · '+note().join(' · '):''));
   s.addChart(p.charts.BAR,[{name:'A2G full plan',labels:rows.map(r=>r.n),values:rows.map(r=>Math.round(r.h.a))},{name:'Starlink',labels:rows.map(r=>r.n),values:rows.map(r=>Math.round(r.h.s))}],
     {x:0.6,y:1.6,w:7.2,h:5.2,barDir:'col',barGrouping:'clustered',chartColors:[P.a2g,P.leo],showValue:true,dataLabelPosition:'outEnd',dataLabelFormatCode:'0"%"',dataLabelFontSize:11,valAxisMaxVal:100,valAxisMinVal:0,valAxisLabelFormatCode:'0"%"',valAxisLabelFontSize:10,catAxisLabelFontSize:11,valGridLine:{color:'E3E9F0',size:0.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:11});
   const hd=['Airline','A2G','Starlink','Recommend'].map((t,i)=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:P.navy},align:i&&i<3?'right':'left'}}));
@@ -92,7 +122,7 @@ function detailSlide(p,n){ const a=D.airlines[n],h=head(a); const s=p.addSlide({
 function methodSlide(p,extra){ const s=p.addSlide({masterName:'LIGHT'}); title(s,'Method and sources');
   const items=['A2G full plan: a stretch of route is covered when it is over, or within '+D.buffer_km+' km of, a country in the SKYFive A2G plan (KSA, Europe, India, Oman, Turkey, Egypt, UAE, Qatar, Jordan, Iraq and the planned African and Asian markets).',
     'Starlink: a stretch is covered when it is over a country marked Available on starlink.com/map (feed read 3 Nov 2026) or over open sea. Pending regulatory, coming soon and unknown count as not covered. This is Starlink’s best case: airlines also need each overflown state’s authorisation.',
-    'Routes: Oman Air uses the attached FR24 track file (44 actual flights from Muscat; the COK track ended at Hyderabad and was left out). Other airlines use the routes in the SKYFive A2G Coverage Globe. Traffic weights come from its FR24 sample, 21 Sep – 6 Oct 2026.'].concat(extra||[]);
+    'Routes: Oman Air uses the attached FR24 track file (44 actual flights from Muscat; the COK track ended at Hyderabad and was left out). Other airlines use the routes in the SKYFive A2G Coverage Globe. Traffic weights come from its FR24 sample, 21 Sep – 6 Oct 2026.'].concat(note()).concat(extra||[]);
   s.addText(items.map((t,i)=>({text:t,options:{bullet:true,breakLine:i<items.length-1}})),{x:0.6,y:1.4,w:12.1,h:5.3,fontSize:15,color:P.ink,margin:0,valign:'top',paraSpaceAfter:12}); return s; }
 async function getDL(){ for(let i=0;i<8&&!(window.claude&&window.claude.use);i++) await new Promise(r=>setTimeout(r,250));
   try{ return window.claude&&window.claude.use ? await window.claude.use('downloads') : null; }catch(e){ return null; } }
@@ -100,5 +130,5 @@ async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName
   const dl=await getDL();
   if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
   const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
-window.SKYCOV={head,rec,TIE,pct,T,setMode,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
+window.SKYCOV={head,rec,TIE,pct,T,setMode,set,state:()=>({mode:ST.mode,off:[...ST.off],cs:ST.cs}),csAdded,note,CS_NEVER,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
 })();

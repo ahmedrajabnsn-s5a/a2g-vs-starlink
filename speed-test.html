@@ -177,7 +177,8 @@ canvas.net{width:100%;height:220px;display:block;border-radius:12px;background:#
 <script src="covmap.js"></script>
 <script>
 (function(){
-const CD=window.COVDATA;const COV={}; // share of flight time covered: A2G full plan (150 km) vs Starlink map, same basis as the coverage page
+const CD=window.COVDATA;try{ const o=JSON.parse(localStorage.getItem('skyfive-cov-off')||'[]'); SKYCOV.set({off:o,cs:localStorage.getItem('skyfive-cov-cs')==='1'}); }catch(e){}
+const COV={}; // share of flight time covered: A2G full plan (150 km) vs Starlink map, same basis as the coverage page
 ['Oman Air','SalamAir',...CD.order.filter(n=>n!=='Oman Air'&&n!=='SalamAir')].forEach(n=>{const h=SKYCOV.head(CD.airlines[n]);COV[n]={a:Math.round(h.a),l:Math.round(h.s),basis:h.basis};});
 const $=id=>document.getElementById(id);
 const sel=$('airline'); Object.keys(COV).forEach(k=>sel.add(new Option(k,k)));

@@ -32,7 +32,7 @@ function texture(w,L){ L=L||'both'; const SHOW_A=L!=='leo', SHOW_S=L!=='a2g';
   if(SHOW_S) for(const f of F){ const i=info(f.properties.name); if(!OKS.has(i.sl)||(i.plan&&SHOW_A)) continue; c.beginPath(); path(f); c.strokeStyle='rgba(255,190,120,.75)'; c.lineWidth=w/1800; c.stroke(); }
   const t=new THREE.CanvasTexture(cv); t.anisotropy=8; return t;
 }
-const TEX={}; function tex(L){ L=L||'both'; const k=L+'|'+(window.SKYMODE||'plan'); return TEX[k]||(TEX[k]=texture(4096,L)); }
+const TEX={}; function tex(L){ L=L||'both'; const k=L+'|'+(window.SKYSTATE||window.SKYMODE||'plan'); return TEX[k]||(TEX[k]=texture(4096,L)); }
 
 function create(canvas,opt){
   opt=opt||{}; const W=()=>opt.width||canvas.clientWidth||800, H=()=>opt.height||canvas.clientHeight||600;

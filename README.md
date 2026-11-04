@@ -7,6 +7,12 @@ Two linked web pages for comparing SKYFive's A2G (air-to-ground) network with St
 
 Recommendation rule: when coverage is within 3 points, A2G is recommended (dedicated capacity, better upload and latency).
 
+
+## Smart controls
+- **A2G countries**: tick or untick any country (Europe as one block) in the A2G plan; every score, map and PPT updates.
+- **＋ Starlink coming soon**: adds the countries Starlink lists as coming soon, pending approval or unknown, always excluding India, Turkey, China and Egypt.
+- **A2G full plan / Current A2G**: full roll-out plan or the network live today (KSA + 44 European countries).
+
 ## Data
 - Starlink status: starlink.com/map availability feed, 3 Nov 2026. Starlink's map shows consumer service; airlines also need each state's authorisation, so Starlink figures are a best case.
 - Routes and FR24 traffic sample (21 Sep – 6 Oct 2026): SKYFive A2G Coverage Globe. Oman Air: actual FR24 tracks from Muscat (44 flights).

@@ -51,6 +51,23 @@ select{font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid 
 a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .layers{margin-left:0}
 .basis-t{margin-left:auto}
+.smart{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.06em;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mute)}
+.smart:hover{color:var(--ink)} .smart:focus-visible{outline:2px solid #ffcf5c;outline-offset:2px}
+.smart[aria-pressed=true]{color:#ffcf5c;border-color:#ffb877;background:rgba(255,157,69,.14)}
+.smart.a[aria-expanded=true],.smart.a.off{color:var(--a2g);border-color:var(--a2g);background:rgba(63,216,255,.1)}
+.smart b{font-family:var(--f-mono);font-weight:600}
+.ddw{position:relative}
+.dd{position:absolute;z-index:20;top:calc(100% + 8px);left:0;width:min(380px,calc(100vw - 32px));max-height:min(520px,70vh);overflow:auto;padding:14px 16px;border-radius:14px;background:#0b1d36;border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.dd h4{margin:10px 0 6px;font-family:var(--f-display);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute)}
+.dd .q{display:flex;gap:6px;flex-wrap:wrap}
+.dd .q button{all:unset;cursor:pointer;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line)}
+.dd .q button:hover{border-color:var(--a2g)}
+.dd .g{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
+.dd label{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:4px 4px;border-radius:6px;cursor:pointer}
+.dd label:hover{background:rgba(255,255,255,.04)}
+.dd input{accent-color:var(--a2g);width:16px;height:16px}
+.dd small{color:var(--mute)}
+.state{font-size:12.5px;color:#ffcf5c}
 .basis-t button[aria-pressed=true][data-m=now]{background:rgba(255,207,92,.16);color:#ffcf5c}
 .toggle{margin-left:0}
 @media(max-width:940px){.hero{grid-template-columns:1fr}}
@@ -132,6 +149,11 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       <button type="button" id="vOne" aria-pressed="true">Active airline</button>
       <button type="button" id="vAll" aria-pressed="false">All selected</button>
     </div>
+    <div class="ddw">
+      <button type="button" class="smart a" id="ctyBtn" aria-expanded="false" aria-controls="ctyPan" title="Choose which countries count in the A2G plan">A2G countries <b id="ctyN"></b> ▾</button>
+      <div class="dd" id="ctyPan" hidden role="dialog" aria-label="Countries in the A2G calculation"></div>
+    </div>
+    <button type="button" class="smart" id="cs" aria-pressed="false" title="">＋ Starlink coming soon</button>
     <div class="toggle basis-t" role="group" aria-label="A2G network" title="Full plan = every country in the roll-out plan. Current = live today (KSA + 44 European countries).">
       <button type="button" data-m="plan" aria-pressed="true">A2G full plan</button>
       <button type="button" data-m="now" aria-pressed="false">Current A2G</button>
@@ -185,6 +207,7 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       <div class="kpi a"><small>A2G full plan</small><b id="kA">–</b></div>
       <div class="kpi l"><small>Starlink</small><b id="kL">–</b></div>
       <div class="basis" id="kBasis"></div>
+      <div class="state" id="kState"></div>
       <div class="kpi" id="k2"></div>
       <div class="rec" id="rec"></div>
       <p class="verdict" id="verdict"></p>
@@ -311,23 +334,42 @@ function renderCmp(){ $('cmp').innerHTML='<tr><th>Airline</th><th>A2G full plan<
 const ORIGTXT=new WeakMap();
 function relabel(){ const w=document.createTreeWalker(document.querySelector('.wrap'),NodeFilter.SHOW_TEXT); let n;
   while((n=w.nextNode())){ if(n.parentElement&&n.parentElement.closest('.basis-t')) continue; if(!ORIGTXT.has(n)) ORIGTXT.set(n,n.nodeValue); const o=ORIGTXT.get(n), v=SKYCOV.T(o); if(n.nodeValue!==v) n.nodeValue=v; } }
-let amode='plan';
-document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ amode=b.dataset.m; document.querySelectorAll('.basis-t button').forEach(x=>x.setAttribute('aria-pressed',x===b)); SKYCOV.setMode(amode);
-  $('msg').textContent=amode==='now'?'Showing current A2G: the network live today (KSA and 44 European countries) with 150 km reach.':'Showing the A2G full roll-out plan with 150 km reach.'; renderAll(); });
-function renderAll(){ chips(); fillAdd(); renderCmp(); renderAirline(); speedLink(); drawGlobe(); relabel(); }
+document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.basis-t button').forEach(x=>x.setAttribute('aria-pressed',x===b)); SKYCOV.set({mode:b.dataset.m});
+  $('msg').textContent=b.dataset.m==='now'?'Showing current A2G: the network live today (KSA and 44 European countries) with 150 km reach.':'Showing the A2G full roll-out plan with 150 km reach.'; renderAll(); });
+// ---------- smart controls: A2G countries in the calculation, Starlink coming-soon countries
+const OFFKEY='skyfive-cov-off', CSKEY='skyfive-cov-cs';
+try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=localStorage.getItem(CSKEY)==='1'; SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs}); }catch(e){}
+const csList=SKYCOV.csAdded();
+$('cs').title='Adds the countries Starlink lists as coming soon, pending approval or unknown: '+csList.join(', ')+'. Always excluded: India, Turkey, China, Egypt.';
+function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.length-off.size;
+  $('ctyN').textContent=n+'/'+D.units.length; $('ctyBtn').classList.toggle('off',off.size>0); $('cs').setAttribute('aria-pressed',st.cs);
+  $('ctyPan').innerHTML=`<div class="q"><button type="button" data-q="all">All</button><button type="button" data-q="live">Live today only</button><button type="button" data-q="none">None</button></div>`+
+    D.tiers.map((t,ti)=>{ const us=D.units.filter(u=>u.tier===ti); if(!us.length) return ''; return `<h4>${t}</h4><div class="g">`+us.map(u=>`<label><input type="checkbox" data-u="${u.id}" ${off.has(u.id)?'':'checked'}>${u.name}${u.n>1?` <small>(${u.n})</small>`:''}</label>`).join('')+'</div>'; }).join('')+
+    `<p class="basis" style="margin:10px 0 0">Unticked countries no longer count for A2G anywhere: scores, map, recommendation and PPT. Europe counts as one block.</p>`;
+  $('ctyPan').querySelectorAll('input').forEach(i=>i.onchange=()=>{ const o=new Set(SKYCOV.state().off); i.checked?o.delete(i.dataset.u):o.add(i.dataset.u); applyState({off:[...o]}); });
+  $('ctyPan').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{ const q=b.dataset.q; applyState({off:q==='all'?[]:q==='none'?D.units.map(u=>u.id):D.units.filter(u=>u.tier!==0).map(u=>u.id)}); });
+  const notes=SKYCOV.note(); $('kState').textContent=notes.join(' · '); }
+function applyState(o){ SKYCOV.set(o); const st=SKYCOV.state(); try{ localStorage.setItem(OFFKEY,JSON.stringify(st.off)); localStorage.setItem(CSKEY,st.cs?'1':'0'); }catch(e){} renderAll(); }
+$('ctyBtn').onclick=e=>{ e.stopPropagation(); const open=$('ctyPan').hidden; $('ctyPan').hidden=!open; $('ctyBtn').setAttribute('aria-expanded',open); };
+document.addEventListener('click',e=>{ if(!$('ctyPan').hidden&&!e.target.closest('.ddw')){ $('ctyPan').hidden=true; $('ctyBtn').setAttribute('aria-expanded',false); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('ctyPan').hidden){ $('ctyPan').hidden=true; $('ctyBtn').setAttribute('aria-expanded',false); $('ctyBtn').focus(); } });
+$('cs').onclick=()=>{ const on=!SKYCOV.state().cs; applyState({cs:on}); $('msg').textContent=on?'Starlink now includes its coming-soon, pending and unknown countries ('+csList.length+'), except India, Turkey, China and Egypt.':'Starlink is back to countries marked Available today.'; };
+function renderAll(){ ctyRender(); chips(); fillAdd(); renderCmp(); renderAirline(); speedLink(); drawGlobe(); relabel(); }
 // ---------- CSV upload: score actual tracks in the browser on a 0.2° grid (country + A2G 150 km reach)
-const GR=window.COVGRID; let GC=null,GRc=null,GRn=null;
+const GR=window.COVGRID; let GC=null,GM=null;
 function unrle(a){ const o=new Uint8Array(GR.nx*GR.ny); let k=0; for(let i=0;i<a.length;i+=2){ o.fill(a[i],k,k+a[i+1]); k+=a[i+1]; } return o; }
-function nowReach(){ // live-today countries dilated by 150 km on the same grid
-  const NX=GR.nx,NY=GR.ny,o=new Uint8Array(NX*NY),RC=SKYCOV.getRaw?null:null, live=GR.names.map(c=>{const x=(window.COVDATA_RAWC||{})[c.n];return x?x.now:0;});
-  const isL=i=>GC[i]&&live[GC[i]-1]; const ry=Math.ceil(150/(111*GR.res));
-  for(let y=0;y<NY;y++)for(let x=0;x<NX;x++){const i=y*NX+x;if(!isL(i))continue;o[i]=1;
-    const edge=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const xx=x+dx,yy=y+dy;return xx<0||yy<0||xx>=NX||yy>=NY||!isL(yy*NX+xx);}); if(!edge) continue;
-    for(let dy=-ry;dy<=ry;dy++){const yy=y+dy;if(yy<0||yy>=NY)continue;const la=GR.lat1-(yy+.5)*GR.res, kx=111*Math.cos(la*Math.PI/180)*GR.res, ky=111*GR.res, rx=Math.ceil(150/Math.max(kx,5));
-      for(let dx=-rx;dx<=rx;dx++){const xx=x+dx;if(xx<0||xx>=NX)continue;if((dx*kx)**2+(dy*ky)**2<=22500)o[yy*NX+xx]=1;}}}
-  return o; }
-function cell(lon,lat){ if(!GC){GC=unrle(GR.cells);GRc=unrle(GR.reach);GRn=nowReach();} const x=Math.floor((lon-GR.lon0)/GR.res), y=Math.floor((GR.lat1-lat)/GR.res);
-  if(x<0||y<0||x>=GR.nx||y>=GR.ny) return {c:null,a:0,s:1,n:0}; const i=y*GR.nx+x, ci=GC[i], c=ci?GR.names[ci-1]:null; return {c:c?c.n:'Open sea',a:GRc[i]?1:0,s:c?c.sl:1,n:GRn[i]&&GRc[i]?1:0}; }
+function unitMasks(){ // per grid cell: which A2G plan units are within 150 km (each unit dilated separately)
+  const NX=GR.nx,NY=GR.ny,M=new Uint32Array(NX*NY), uOf=GR.names.map(c=>{const x=D.rawCountries[c.n];return x?x.unit:-1;}), ry=Math.ceil(150/(111*GR.res));
+  const unitAt=i=>GC[i]?uOf[GC[i]-1]:-1;
+  for(let y=0;y<NY;y++)for(let x=0;x<NX;x++){ const i=y*NX+x, u=unitAt(i); if(u<0) continue; const bit=(1<<u)>>>0; M[i]|=bit;
+    const edge=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const xx=x+dx,yy=y+dy;return xx<0||yy<0||xx>=NX||yy>=NY||unitAt(yy*NX+xx)!==u;}); if(!edge) continue;
+    for(let dy=-ry;dy<=ry;dy++){ const yy=y+dy; if(yy<0||yy>=NY) continue; const la=GR.lat1-(yy+.5)*GR.res, kx=111*Math.cos(la*Math.PI/180)*GR.res, ky=111*GR.res, rx=Math.ceil(150/Math.max(kx,5));
+      for(let dx=-rx;dx<=rx;dx++){ const xx=x+dx; if(xx<0||xx>=NX) continue; if((dx*kx)**2+(dy*ky)**2<=22500) M[yy*NX+xx]|=bit; } } }
+  return M; }
+const CI=new Map(D.cnames.map((c,i)=>[c.n,i]));
+function ciOf(name){ if(!name) return 0; if(!CI.has(name)){ CI.set(name,D.cnames.length); D.cnames.push({n:name,st:(D.rawCountries[name]||{}).st||'not listed'}); } return CI.get(name); }
+function cell(lon,lat){ if(!GC){ GC=unrle(GR.cells); GM=unitMasks(); } const x=Math.floor((lon-GR.lon0)/GR.res), y=Math.floor((GR.lat1-lat)/GR.res);
+  if(x<0||y<0||x>=GR.nx||y>=GR.ny) return [0,0]; const i=y*GR.nx+x, c=GC[i]; return [c?ciOf(GR.names[c-1].n):0, GM[i]]; }
 const hav=(a,b)=>{const r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
 function splitCSV(line){ const o=[];let cur='',q=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch==='"'){q=!q;continue;} if(ch===','&&!q){o.push(cur);cur='';continue;} cur+=ch;} o.push(cur); return o.map(v=>v.trim()); }
 function parseTracks(text,airline){
@@ -345,32 +387,30 @@ function parseTracks(text,airline){
     const key=(iC>=0?v[iC]:'')+'|'+o+'|'+d; (fl.get(key)||fl.set(key,[]).get(key)).push([t,lon,lat]); }
   // split each key into flights on gaps of 3 h or more
   const flights=[]; for(const [key,arr] of fl){ arr.sort((a,b)=>a[0]-b[0]); let cur=[arr[0]]; for(let i=1;i<arr.length;i++){ if(arr[i][0]-arr[i-1][0]>10800){flights.push([key,cur]);cur=[];} cur.push(arr[i]); } flights.push([key,cur]); }
-  const routes=new Map(), GA={}, GS={}, GN={}; let TK=0,TA=0,TS=0,TN=0,nF=0;
+  const routes=new Map(); let nF=0;
   for(const [key,pts] of flights){ if(pts.length<5) continue; const [,o,d]=key.split('|'); let P=[]; for(const p of pts){ const q=[p[1],p[2]]; if(!P.length||hav(P[P.length-1],q)>=3) P.push(q); }
-    if(P.length<3) continue; // densify long gaps along the great circle
+    if(P.length<3) continue;
     const Q=[P[0]]; for(let i=1;i<P.length;i++){ const L=hav(P[i-1],P[i]); if(L>15){ const f=d3.geoInterpolate(P[i-1],P[i]), n=Math.ceil(L/10); for(let j=1;j<n;j++) Q.push(f(j/n)); } Q.push(P[i]); }
-    const fl2=Q.map(p=>{const g=cell(p[0],p[1]); return [p[0],p[1],(g.a?1:0)|(g.s?2:0)|(g.n?4:0),g.c];}); let T=0,A=0,S=0,AN=0;
-    for(let i=0;i<fl2.length-1;i++){ const L=hav(fl2[i],fl2[i+1]); T+=L; const ca=(fl2[i][2]&1)&&(fl2[i+1][2]&1), cs=(fl2[i][2]&2)&&(fl2[i+1][2]&2); if(ca)A+=L; if(cs)S+=L; const cn=(fl2[i][2]&4)&&(fl2[i+1][2]&4); if(cn)AN+=L; else {const c=!(fl2[i][2]&4)?fl2[i][3]:fl2[i+1][3]; GN[c]=(GN[c]||0)+L;}
-      if(!ca){const c=!(fl2[i][2]&1)?fl2[i][3]:fl2[i+1][3]; GA[c]=(GA[c]||0)+L;} if(!cs){const c=!(fl2[i][2]&2)?fl2[i][3]:fl2[i+1][3]; GS[c]=(GS[c]||0)+L;} }
-    if(T<50) continue; nF++; TK+=T; TA+=A; TS+=S; TN+=AN;
+    const R=Q.map(p=>{const g=cell(p[0],p[1]); return [+p[0].toFixed(2),+p[1].toFixed(2),g[0],g[1]];}); let T=0; for(let i=1;i<R.length;i++) T+=hav(R[i-1],R[i]);
+    if(T<50) continue; nF++;
     const hubFirst=(o===airline.hub||!airline.hubs.includes(d)); const rk=hubFirst?o+'-'+d:d+'-'+o;
-    const r=routes.get(rk)||{o:hubFirst?o:d,d:hubFirst?d:o,km:0,a:0,s:0,n:0,pts:null,best:0}; r.n++; r.km+=T; r.a+=A; r.s+=S; r.an=(r.an||0)+AN;
-    if(T>r.best){ r.best=T; const th=[fl2[0]]; let acc=0; for(let i=1;i<fl2.length-1;i++){ acc+=hav(fl2[i-1],fl2[i]); if(acc>=25||fl2[i][2]!==th[th.length-1][2]){ th.push(fl2[i]); acc=0; } } th.push(fl2[fl2.length-1]); r.pts=th.map(p=>[+p[0].toFixed(2),+p[1].toFixed(2),p[2]]); }
+    const r=routes.get(rk)||{o:hubFirst?o:d,d:hubFirst?d:o,src:'upload',kmSum:0,flights:0,pts:null,best:0}; r.flights++; r.kmSum+=T;
+    if(T>r.best){ r.best=T; const same=(a,b)=>a[2]===b[2]&&a[3]===b[3]; const th=[R[0]]; let acc=0;
+      for(let i=1;i<R.length-1;i++){ acc+=hav(R[i-1],R[i]); if(acc>=25||!same(R[i],th[th.length-1])||!same(R[i+1],R[i])){ th.push(R[i]); acc=0; } } th.push(R[R.length-1]); r.pts=th; }
     routes.set(rk,r);
     [[o,P[0]],[d,P[P.length-1]]].forEach(([c,p])=>{ if(!D.airports[c]) D.airports[c]={lat:p[1],lon:p[0],city:c}; }); }
   if(!nF) throw new Error('No complete flights found in the file.');
-  const top=o=>Object.entries(o).map(([k,v])=>[k,+(v/TK*100).toFixed(1)]).filter(x=>x[1]>=0.1).sort((x,y)=>y[1]-x[1]).slice(0,6);
-  return {...airline,uploaded:{flights:nF},tw:null,markets:null,net:{a:TA/TK*100,s:TS/TK*100,an:TN/TK*100,routes:routes.size},gapsA:top(GA),gapsS:top(GS),gapsN:top(GN),
-    routes:[...routes.values()].map(r=>({o:r.o,d:r.d,km:Math.round(r.km/r.n),src:'upload',a:Math.round(r.a/r.km*100),s:Math.round(r.s/r.km*100),an:Math.round((r.an||0)/r.km*100),seats:null,flights:r.n,pts:r.pts}))};
+  return {name:airline.name,iata:airline.iata,icao:airline.icao,cc:airline.cc,hub:airline.hub,hubs:airline.hubs,fleet:airline.fleet,flights:null,markets:null,calcs:null,uploaded:{flights:nF},
+    routes:[...routes.values()].map(r=>({o:r.o,d:r.d,km:Math.round(r.kmSum/r.flights),src:'upload',seats:null,flights:r.flights,pts:r.pts}))};
 }
-window.COVDATA_RAWC=D.countries; const ORIG={}; const upKey=n=>'skyfive-cov-upload2-'+n;
-function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=SKYCOV.getRaw(n)||D.airlines[n]; SKYCOV.setRaw(n,obj); }
+const ORIG={}; const upKey=n=>'skyfive-cov-upload3-'+n;
+function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=SKYCOV.getRaw(n); SKYCOV.setRaw(n,obj); }
 // restore uploads saved in this browser
-Object.keys(D.airlines).forEach(n=>{ try{ const s=localStorage.getItem(upKey(n)); if(s){ const o=JSON.parse(s); if(!o.net||o.net.an==null) return; Object.assign(D.airports,o.__ap||{}); delete o.__ap; applyUpload(n,o); } }catch(e){} });
+Object.keys(D.airlines).forEach(n=>{ try{ const s=localStorage.getItem(upKey(n)); if(s){ const o=JSON.parse(s); if(!o.routes||!o.__cn) return; Object.assign(D.airports,o.__ap||{}); o.routes.forEach(r=>r.pts.forEach(p=>{p[2]=ciOf(o.__cn[p[2]]);})); delete o.__ap; delete o.__cn; applyUpload(n,o); } }catch(e){} });
 async function handleFile(f){ if(!f) return; const n=active; $('msg').textContent='Reading '+f.name+'…'; await new Promise(r=>setTimeout(r,20));
-  try{ const obj=parseTracks(await f.text(),ORIG[n]||SKYCOV.getRaw(n)||D.airlines[n]); obj.uploaded.file=f.name; applyUpload(n,obj);
-    try{ const ap={}; obj.routes.forEach(r=>[r.o,r.d].forEach(c=>ap[c]=D.airports[c])); localStorage.setItem(upKey(n),JSON.stringify({...obj,__ap:ap})); }catch(e){}
-    $('msg').textContent=`${n}: using ${obj.uploaded.flights} flights on ${obj.net.routes} routes from ${f.name}. A2G planned network ${Math.round(obj.net.a)}%, A2G live today ${Math.round(obj.net.an)}%, Starlink ${Math.round(obj.net.s)}%.`; renderAll(); }
+  try{ const obj=parseTracks(await f.text(),ORIG[n]||SKYCOV.getRaw(n)); obj.uploaded.file=f.name; applyUpload(n,obj);
+    try{ const ap={}; obj.routes.forEach(r=>[r.o,r.d].forEach(c=>ap[c]=D.airports[c])); localStorage.setItem(upKey(n),JSON.stringify({...obj,__ap:ap,__cn:D.cnames.map(c=>c.n)})); }catch(e){}
+    $('msg').textContent=`${n}: using ${obj.uploaded.flights} flights on ${obj.routes.length} routes from ${f.name}. A2G ${Math.round(D.airlines[n].net.a)}% vs Starlink ${Math.round(D.airlines[n].net.s)}% with the current settings.`; renderAll(); }
   catch(e){ $('msg').textContent='Could not read that file: '+e.message; } }
 $('csv').onchange=e=>{ handleFile(e.target.files[0]); e.target.value=''; };
 const up=$('up'); ['dragenter','dragover'].forEach(t=>up.addEventListener(t,e=>{e.preventDefault();up.classList.add('drag');}));
