@@ -132,5 +132,21 @@ async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName
   const dl=await getDL();
   if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
   const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
+// ---------- Export PPT chooser: flat map or 3D globe for the map images (both pages)
+(function(){ const btn=document.getElementById('ppt'); if(!btn) return; let go=false; let pref='flat'; try{ pref=localStorage.getItem('skyfive-ppt-map')||'flat'; }catch(e){}
+  const m=document.createElement('div'); m.id='pptMenu'; m.hidden=true; m.setAttribute('role','dialog'); m.setAttribute('aria-label','Choose the map style for the PPT');
+  m.style.cssText='position:absolute;z-index:40;padding:12px 14px;border-radius:14px;background:#0b1d36;border:1px solid #1f3758;box-shadow:0 20px 50px rgba(0,0,0,.5);color:#e9f2fb;font:14px "IBM Plex Sans",system-ui,sans-serif;display:grid;gap:8px;min-width:230px';
+  const bs='all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid #1f3758;font-weight:600';
+  m.innerHTML=`<div style="font:600 11px 'Chakra Petch',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#8ea6c2">Map style in the PPT</div>
+    <button type="button" data-s="flat" style="${bs}">▭ Flat map</button><button type="button" data-s="globe" style="${bs}">◍ 3D globe</button>
+    <div style="font-size:12px;color:#8ea6c2;max-width:240px">3D globe falls back to the flat map if this device can’t draw 3D.</div>`;
+  document.body.appendChild(m);
+  const mark=()=>m.querySelectorAll('button').forEach(b=>{ b.style.borderColor=b.dataset.s===pref?'#3fd8ff':'#1f3758'; b.style.background=b.dataset.s===pref?'rgba(63,216,255,.1)':'transparent'; });
+  const place=()=>{ const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+8)+'px'; m.style.left=Math.max(16,Math.min(r.left+window.scrollX,window.scrollX+document.documentElement.clientWidth-260))+'px'; };
+  document.addEventListener('click',e=>{ if(go) return; const t=e.target.closest&&e.target.closest('#ppt'); if(t){ e.preventDefault(); e.stopImmediatePropagation(); mark(); place(); m.hidden=!m.hidden; if(!m.hidden) m.querySelector(`[data-s="${pref}"]`).focus(); return; }
+    if(!m.hidden&&!m.contains(e.target)) m.hidden=true; },true);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!m.hidden){ m.hidden=true; btn.focus(); } });
+  m.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ pref=b.dataset.s; try{ localStorage.setItem('skyfive-ppt-map',pref); }catch(e){} window.SKYPPTMAP=pref; m.hidden=true; go=true; btn.click(); go=false; }));
+})();
 window.SKYCOV={head,rec,TIE,pct,T,setMode,set,state:()=>({mode:ST.mode,off:[...ST.off],cs:[...ST.cs]}),csAdded,csGroups,note,CS_NEVER,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
 })();

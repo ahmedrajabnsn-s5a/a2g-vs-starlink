@@ -117,7 +117,7 @@ function create(canvas,opt){
 }
 // ---------- snapshot for PPT: an offscreen globe, labels and legend drawn on top
 let OFF=null;
-function snapshot(names,o){ o=o||{}; try{ const url=snap3d(names,o); if(url) return url; }catch(e){ console.warn('3D snapshot failed, using flat map',e); OFF=null; }
+function snapshot(names,o){ o=o||{}; if((o.style||window.SKYPPTMAP)==='flat'&&window.SKYFLAT) return SKYFLAT.snapshot(names,o); try{ const url=snap3d(names,o); if(url) return url; }catch(e){ console.warn('3D snapshot failed, using flat map',e); OFF=null; }
   return window.SKYFLAT?SKYFLAT.snapshot(names,o):''; }
 function looksBlank(cv){ try{ const c=document.createElement('canvas'); c.width=64; c.height=50; const g=c.getContext('2d'); g.drawImage(cv,0,0,64,50); const d=g.getImageData(0,0,64,50).data; let s=0; for(let i=0;i<d.length;i+=4) s+=d[i]+d[i+1]+d[i+2]; return s/(d.length/4)<40; }catch(e){ return false; } }
 function snap3d(names,o){ const w=o.w||1920,h=o.h||1500;

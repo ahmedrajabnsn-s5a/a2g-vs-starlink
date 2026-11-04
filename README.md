@@ -13,6 +13,7 @@ Recommendation rule: when coverage is within 3 points, A2G is recommended (dedic
 - **＋ Starlink future**: drop-down of Starlink's not-yet-available countries (pending approval, coming soon, unknown), KSA first, with KSA-only / all-pending / all shortcuts. India, Turkey, China and Egypt are excluded by default and can be ticked individually; the shortcuts never include them.
 - **Map shading**: live A2G and available Starlink countries in full colour; A2G future-plan countries and chosen Starlink future countries in a lighter shade.
 - **A2G full plan / Current A2G**: full roll-out plan or the network live today (KSA + 44 European countries).
+- **Export PPT**: choose the map style for the slides, flat map or 3D globe (falls back to flat if the device can't draw 3D).
 
 ## Data
 - Starlink status: starlink.com/map availability feed, 3 Nov 2026. Starlink's map shows consumer service; airlines also need each state's authorisation, so Starlink figures are a best case.
