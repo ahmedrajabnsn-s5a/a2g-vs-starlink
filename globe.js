@@ -59,34 +59,34 @@ function create(canvas,opt){
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.012,96,72),holo));
   { const n=2200,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const v=new THREE.Vector3().randomDirection().multiplyScalar(1400+Math.random()*1200); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xbfffe6,size:1.5,sizeAttenuation:false,transparent:true,opacity:.5}))); }
   const composer=new THREE.EffectComposer(renderer); composer.addPass(new THREE.RenderPass(scene,camera));
-  const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(W(),H()),.38,.5,.74); composer.addPass(bloom);
+  const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(W(),H()),.22,.4,.8); composer.addPass(bloom);
   composer.setSize(W(),H());
   const routes=new THREE.Group(); globe.add(routes); let mats=[], comet=null, cometData=[], apList=[];
   function clear(){ for(const o of routes.children.slice()){ routes.remove(o); o.geometry.dispose(); o.material.dispose(); } mats=[]; comet=null; cometData=[]; apList=[]; }
-  function mat(width,color,opacity,dashed){ const m=new THREE.LineMaterial({color:new THREE.Color(`rgb(${color.join(',')})`),linewidth:width,transparent:true,opacity,depthWrite:false,dashed:!!dashed,dashSize:1.2,gapSize:1.1});
+  function mat(width,color,opacity,dashed){ const m=new THREE.LineMaterial({color:new THREE.Color(`rgb(${color.join(',')})`),linewidth:width,transparent:true,opacity,depthWrite:false,dashed:!!dashed,dashSize:.9,gapSize:1.3});
     if(dashed) m.defines.USE_DASH=''; m.resolution.set(W(),H()); mats.push(m); return m; }
   let lastNames=[];
   function setLayer(L){ layer=L||'both'; const t=tex(layer); backM.map=t; frontM.map=t; backM.needsUpdate=frontM.needsUpdate=true; show(lastNames); }
   function show(names){
-    lastNames=names; clear(); const ap=new Map(), hubs=new Set();
+    lastNames=names; clear(); const ap=new Map(), hubs=new Set(), seen=new Set(), deg=new Map();
     for(const n of names){ const a=CD.airlines[n]; if(!a) continue; a.hubs.forEach(h=>hubs.add(h));
-      for(const r of a.routes){ const P=r.pts, nP=P.length; const h=Math.min(30,3+r.km/280); const vs=P.map((p,i)=>ll2v(p[0],p[1],R+0.5+h*Math.sin(Math.PI*i/(nP-1))));
+      for(const r of a.routes){ const key=[r.o,r.d].sort().join('-'); [r.o,r.d].forEach(c=>deg.set(c,(deg.get(c)||0)+1)); if(seen.has(key)) continue; seen.add(key); const P=r.pts, nP=P.length; const h=Math.min(12,1.2+r.km/700); const vs=P.map((p,i)=>ll2v(p[0],p[1],R+0.5+h*Math.sin(Math.PI*i/(nP-1))));
         // runs of the same class
         let i=0; while(i<nP-1){ const k=cls(P[i][2],P[i+1][2],layer); let j=i+1; while(j<nP-1&&cls(P[j][2],P[j+1][2],layer)===k) j++;
           const pos=[]; for(let q=i;q<=j;q++) pos.push(vs[q].x,vs[q].y,vs[q].z);
           const g=new THREE.LineGeometry(); g.setPositions(pos);
-          const halo=new THREE.Line2(g,mat(k==='none'?5:9,COL[k],k==='none'?.1:.22)); halo.computeLineDistances(); routes.add(halo);
+          const halo=new THREE.Line2(g,mat(k==='none'?2.5:4,COL[k],k==='none'?.05:.1)); halo.computeLineDistances(); routes.add(halo);
           const g2=new THREE.LineGeometry(); g2.setPositions(pos);
-          const line=new THREE.Line2(g2,mat(k==='both'?3.2:2.8,COL[k],1,k==='none')); line.computeLineDistances(); routes.add(line);
+          const line=new THREE.Line2(g2,mat(k==='none'?1.2:1.8,COL[k],k==='none'?.7:.92,k==='none')); line.computeLineDistances(); routes.add(line);
           i=j; }
         cometData.push({vs,ph:Math.random(),sp:.04+.25/Math.max(1,r.km/1000)});
         [r.o,r.d].forEach(c=>{ const p=CD.airports[c]; if(p) ap.set(c,p); }); } }
     const mk=(list,lift)=>{ const a=new Float32Array(list.length*3); list.forEach((c,i)=>{ const p=ap.get(c), v=ll2v(p.lon,p.lat,R+lift); a.set([v.x,v.y,v.z],i*3); }); const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(a,3)); return g; };
-    const codes=[...ap.keys()]; apList=codes.map(c=>({c,hub:hubs.has(c),p:ap.get(c)}));
-    routes.add(new THREE.Points(mk(codes.filter(c=>!hubs.has(c)),.6),new THREE.PointsMaterial({color:0xe9f6ff,size:6,sizeAttenuation:false,transparent:true,depthWrite:false})));
-    routes.add(new THREE.Points(mk(codes.filter(c=>hubs.has(c)),.7),new THREE.PointsMaterial({color:0xffffff,size:13,sizeAttenuation:false,transparent:true,depthWrite:false})));
+    const codes=[...ap.keys()]; apList=codes.map(c=>({c,hub:hubs.has(c),p:ap.get(c),w:(hubs.has(c)?1e6:0)+(deg.get(c)||0)})).sort((x,y)=>y.w-x.w);
+    routes.add(new THREE.Points(mk(codes.filter(c=>!hubs.has(c)),.6),new THREE.PointsMaterial({color:0xe9f6ff,size:3.5,sizeAttenuation:false,transparent:true,depthWrite:false})));
+    routes.add(new THREE.Points(mk(codes.filter(c=>hubs.has(c)),.7),new THREE.PointsMaterial({color:0xffffff,size:8,sizeAttenuation:false,transparent:true,depthWrite:false})));
     const cg=new THREE.BufferGeometry(); cg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(cometData.length*3),3));
-    comet=new THREE.Points(cg,new THREE.PointsMaterial({color:0xffffff,size:4.5,sizeAttenuation:false,transparent:true,depthWrite:false})); routes.add(comet);
+    comet=new THREE.Points(cg,new THREE.PointsMaterial({color:0xffffff,size:3,sizeAttenuation:false,transparent:true,depthWrite:false})); routes.add(comet);
   }
   // camera framing for a set of airlines
   function frame(names){
@@ -126,7 +126,8 @@ function snap3d(names,o){ const w=o.w||1920,h=o.h||1500;
   if(looksBlank(G.canvas)){ OFF=null; return null; }
   const out=document.createElement('canvas'); out.width=w; out.height=h; const c=out.getContext('2d'); c.drawImage(G.canvas,0,0);
   c.textBaseline='middle'; const fs=Math.round(w/88);
-  for(const a of G.airports()){ const p=G.project(a.p.lon,a.p.lat); if(!p.vis) continue;
+  const taken=[]; for(const a of G.airports()){ const p=G.project(a.p.lon,a.p.lat); if(!p.vis) continue;
+    const bw=(a.hub?fs*1.3:fs)*0.62*a.c.length+6, bh=(a.hub?fs*1.3:fs)+4, bx=p.x+10, by=p.y-12-bh/2; if(taken.some(t=>bx<t[0]+t[2]&&bx+bw>t[0]&&by<t[1]+t[3]&&by+bh>t[1])) continue; taken.push([bx,by,bw,bh]);
     c.font=`${a.hub?700:600} ${a.hub?fs*1.3:fs}px "IBM Plex Mono", monospace`; c.lineWidth=5; c.strokeStyle='rgba(3,9,22,.9)'; c.strokeText(a.c,p.x+10,p.y-12); c.fillStyle=a.hub?'#ffffff':'#d7e8f7'; c.fillText(a.c,p.x+10,p.y-12); }
   if(o.legend!==false){ const L=o.layer||'both'; const items=L==='a2g'?[['a2g',(window.SKYCOV?SKYCOV.T('A2G full plan covers'):'A2G full plan covers')],['none','No A2G']]:L==='leo'?[['leo','Starlink covers'],['none','No Starlink']]:[['both','Both networks'],['a2g',(window.SKYCOV?SKYCOV.T('A2G full plan only'):'A2G full plan only')],['leo','Starlink only'],['none','Neither']]; const y=h-fs*2.6;
     c.fillStyle='rgba(3,9,22,.72)'; c.fillRect(0,y-fs*1.8,w,fs*3.6);

@@ -86,7 +86,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px}
 .bar{row-gap:8px}
 #globe{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 #labels{position:absolute;inset:0;pointer-events:none}
-.lab{position:absolute;transform:translate(6px,-16px);font-family:var(--f-mono);font-size:11.5px;font-weight:600;color:#d7e8f7;text-shadow:0 0 4px #030916,0 0 2px #030916;white-space:nowrap}
+.lab{position:absolute;transform:translate(6px,-16px);transition:opacity .15s;font-family:var(--f-mono);font-size:11px;font-weight:600;color:#d7e8f7;text-shadow:0 0 4px #030916,0 0 2px #030916;white-space:nowrap}
 .lab.hub{color:#fff;font-size:13px}
 .legend{position:absolute;left:12px;bottom:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;padding:8px 12px;border-radius:12px;background:rgba(3,9,22,.72);backdrop-filter:blur(6px)}
 .legend span{display:inline-flex;align-items:center;gap:7px}
@@ -286,7 +286,7 @@ function persist(){try{localStorage.setItem(KEY,JSON.stringify(sel))}catch(e){}}
 // globe
 let G=null, G2=null, mode='2d', layer='both'; const L1=$('labels'), L2=$('labels2'); let lab1=[], lab2=[];
 const split=()=>layer==='split', layer1=()=>split()?'a2g':layer;
-function place(g,labs){ for(const l of labs){ const p=g.project(l.p.lon,l.p.lat); l.el.style.left=p.x+'px'; l.el.style.top=p.y+'px'; l.el.style.opacity=p.vis?1:0; } }
+function place(g,labs){ const taken=[]; for(const l of labs){ const p=g.project(l.p.lon,l.p.lat); l.el.style.left=p.x+'px'; l.el.style.top=p.y+'px'; let show=p.vis; if(show){ const w=l.w||(l.el.textContent.length*(l.hub?8.2:7.2)+4), h=l.hub?15:13, x=p.x+6, y=p.y-16; if(taken.some(t=>x<t[0]+t[2]&&x+w>t[0]&&y<t[1]+t[3]&&y+h>t[1])) show=false; else taken.push([x,y,w,h]); } l.el.style.opacity=show?1:0; } }
 function onFrame(){ if(!G) return; place(G,lab1); if(split()&&G2){ G2.camera.position.copy(G.camera.position); G2.camera.lookAt(0,0,0); place(G2,lab2); } }
 function lost(){ G=null; G2=null; setMode('2d','The 3D globe stopped (graphics context lost). Showing the flat map.'); }
 function initGlobe(){ if(G) return true; try{ if(!SKYGLOBE.supported()) throw new Error('no WebGL'); G=SKYGLOBE.create($('globe'),{interactive:true,onFrame,onLost:lost}); return true; } catch(e){ console.warn(e); G=null; return false; } }
@@ -296,7 +296,7 @@ function setMode(m,why){ mode=m; $('m3d').setAttribute('aria-pressed',m==='3d');
   document.querySelector('.gwrap .hint').textContent=m==='3d'?'Drag to rotate · scroll to zoom':'Flat map';
   if(why) $('msg').textContent=why; drawGlobe(); }
 function fit(cv){ const r=cv.getBoundingClientRect(),dpr=Math.min(2,devicePixelRatio||1); if(!r.width) return false; cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); return true; }
-function labels(g,box){ box.innerHTML=''; return g.airports().map(a=>{const el=document.createElement('div');el.className='lab'+(a.hub?' hub':'');el.textContent=a.c;box.appendChild(el);return {el,p:a.p};}); }
+function labels(g,box){ box.innerHTML=''; return g.airports().map(a=>{const el=document.createElement('div');el.className='lab'+(a.hub?' hub':'');el.textContent=a.c;box.appendChild(el);return {el,p:a.p,hub:a.hub};}); }
 const LEG={both:`<span><i style="background:#eef6ff"></i>Both networks</span><span><i style="background:var(--a2g)"></i>A2G full plan only</span><span><i style="background:var(--leo)"></i>Starlink only</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>Neither</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G live</span><span><i class="sq" style="background:rgba(140,215,245,.45)"></i>A2G future</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span><span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>`,
   a2g:`<span><i style="background:var(--a2g)"></i>A2G full plan covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No A2G</span><span><i class="sq" style="background:rgba(38,150,205,.75)"></i>A2G plan + 150 km</span><span><i class="sq" style="background:rgba(140,215,245,.45)"></i>A2G future</span>`,
   leo:`<span><i style="background:var(--leo)"></i>Starlink covers</span><span><i style="background:repeating-linear-gradient(90deg,var(--none) 0 5px,transparent 5px 9px)"></i>No Starlink</span><span><i class="sq" style="background:rgba(190,118,48,.85)"></i>Starlink available</span><span><i class="sq" style="background:rgba(240,190,140,.5)"></i>Starlink future</span>`};
