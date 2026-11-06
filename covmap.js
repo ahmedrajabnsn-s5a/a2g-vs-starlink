@@ -135,9 +135,16 @@ function methodSlide(p,extra){ const s=p.addSlide({masterName:'LIGHT'}); title(s
   s.addText(items.map((t,i)=>({text:t,options:{bullet:true,breakLine:i<items.length-1}})),{x:0.6,y:1.4,w:12.1,h:5.3,fontSize:15,color:P.ink,margin:0,valign:'top',paraSpaceAfter:12}); return s; }
 async function getDL(){ for(let i=0;i<40&&!(window.claude&&window.claude.use);i++) await new Promise(r=>setTimeout(r,250));
   try{ return window.claude&&window.claude.use ? await window.claude.use('downloads') : null; }catch(e){ return null; } }
-async function save(p,filename){ const dl=await getDL();
-  if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
-  const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
+async function save(p,filename){ const dl=await getDL(); const blob=await p.write({outputType:'blob'});
+  if(dl) return dl.save({filename,data:blob});
+  // No Claude download service in this view: fall back to a plain browser download, and offer a new tab if the view blocks it.
+  try{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=filename; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000); }catch(e){}
+  const framed=(()=>{ try{ return window.top!==window; }catch(e){ return true; } })();
+  setTimeout(()=>{ const m=document.getElementById('msg'); if(!m) return;
+    if(!framed){ m.textContent='Deck downloaded: check your Downloads folder.'; return; }
+    const href=location.href.split('#')[0]+'#autoexport='+(window.SKYPPTMAP||'flat');
+    m.innerHTML='Deck sent to your browser’s Downloads. Nothing there? This view blocks downloads: <a href="'+href.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" style="color:#3fd8ff;font-weight:600">open the app in a new tab ↗</a> (it exports the deck automatically), or use the full-screen icon at the top right.'; },0);
+  return {fallback:true}; }
 // ---------- Export PPT chooser: flat map or 3D globe for the map images (both pages)
 (function(){ const btn=document.getElementById('ppt'); if(!btn) return; let go=false; let pref='flat'; try{ pref=localStorage.getItem('skyfive-ppt-map')||'flat'; }catch(e){}
   const m=document.createElement('div'); m.id='pptMenu'; m.hidden=true; m.setAttribute('role','dialog'); m.setAttribute('aria-label','Choose the map style for the PPT');
@@ -152,6 +159,9 @@ async function save(p,filename){ const dl=await getDL();
   document.addEventListener('click',e=>{ if(go) return; const t=e.target.closest&&e.target.closest('#ppt'); if(t){ e.preventDefault(); e.stopImmediatePropagation(); mark(); place(); m.hidden=!m.hidden; if(!m.hidden) m.querySelector(`[data-s="${pref}"]`).focus(); return; }
     if(!m.hidden&&!m.contains(e.target)) m.hidden=true; },true);
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!m.hidden){ m.hidden=true; btn.focus(); } });
+  const am=/autoexport=(flat|globe)/.exec(location.hash||''); if(am){ try{ history.replaceState(null,'',location.href.split('#')[0]); }catch(e){}
+    const fire=()=>setTimeout(()=>{ pref=am[1]; window.SKYPPTMAP=pref; go=true; btn.click(); go=false; },3500);
+    if(document.readyState==='complete') fire(); else window.addEventListener('load',fire); }
   m.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ pref=b.dataset.s; try{ localStorage.setItem('skyfive-ppt-map',pref); }catch(e){} window.SKYPPTMAP=pref; m.hidden=true; go=true; btn.click(); go=false; }));
 })();
 window.SKYCOV={head,rec,TIE,pct,T,setMode,set,state:()=>({mode:ST.mode,off:[...ST.off],cs:[...ST.cs]}),csAdded,csGroups,note,CS_NEVER,setRaw,getRaw,ppt:{base,title,cover,summary,mapSlide,compareSlide,detailSlide,methodSlide,save,P,pct}};
