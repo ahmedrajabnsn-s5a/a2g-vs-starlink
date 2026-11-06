@@ -110,6 +110,11 @@ th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:right;white
 th:first-child,td:first-child{text-align:left}
 th{font-family:var(--f-display);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);font-weight:600}
 #rt th{cursor:pointer}
+#rt tr.on td{background:rgba(63,216,255,.12)}
+.libi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:8px 10px;margin:4px 0;border-radius:10px;border:1px solid #23406a;background:rgba(10,26,48,.7);color:var(--ink);cursor:pointer;font:inherit}
+.libi:hover{border-color:var(--a2g)}
+.libi small{color:#8fb0d0;font-size:11.5px}
+#selChip{border-color:var(--a2g);color:var(--a2g)}
 td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
 .tw{overflow-x:auto}
 .tw.tall{max-height:520px}
@@ -133,10 +138,6 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
 .ghost:focus-visible{outline:2px solid #ffcf5c;outline-offset:2px}
 .basis{font-size:12px;color:var(--mute)}
 </style>
-<style>html,body{margin:0}body{min-height:100vh}</style>
-</head>
-<body>
-
 
 <div class="wrap">
   <header class="top">
@@ -146,7 +147,7 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
     </div>
     <div class="acts">
       <button class="btn alt" id="vs" type="button" title="Show the A2G full-plan map and the Starlink map side by side">Starlink map vs A2G map</button>
-      <a class="btn" id="toSpeed" href="speed-test.html">Cabin speed test →</a>
+      <a class="btn" id="toSpeed" href="speed-test.html" target="_blank" rel="noopener">Cabin speed test →</a>
       <button class="btn" id="ppt" type="button">Export PPT</button>
     </div>
   </header>
@@ -156,6 +157,10 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
     <label for="add" class="sr">Add an airline</label>
     <select id="add" title="Add an airline"></select>
     <label class="ghost up-b" for="csv" id="up" title="Upload actual flight tracks for the active airline. Reads the Oman format (Timestamp, Callsign, Position, Terminal, destination) , the flynas format (City most pair, lat, long, airline flag columns) and the Routes format (most city pair, Lat, Long, Domestic | International, Airline). You can also drop a CSV anywhere on the page.">⬆ Upload CSV · <b id="upName">Oman Air</b></label><input type="file" id="csv" accept=".csv,text/csv" hidden>
+    <div class="ddw">
+      <button type="button" class="ghost" id="libBtn" aria-expanded="false" aria-controls="libPan" title="Load one of the saved route files (kept up to date) for any airline">📂 Route files ▾</button>
+      <div class="dd" id="libPan" hidden role="dialog" aria-label="Saved route files"></div>
+    </div>
     <button type="button" class="ghost" id="revert" hidden title="Remove the uploaded CSV and go back to the built-in routes">✕ Remove uploaded CSV</button>
     <div class="toggle" id="srcT" role="group" aria-label="Route source" hidden title="Which built-in routes to use for this airline">
       <button type="button" data-src="fr24" aria-pressed="true">FlightRadar24</button>
@@ -185,6 +190,11 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
       <button type="button" data-l="leo" aria-pressed="false">Starlink only</button>
       <button type="button" data-l="split" aria-pressed="false">Side by side</button>
     </div>
+    <div class="toggle" id="shapeT" role="group" aria-label="Route shape" title="Great circle draws each route as a clean arc. Actual tracks draws the flown path.">
+      <button type="button" data-s="gc" aria-pressed="true">Great circle</button>
+      <button type="button" data-s="track" aria-pressed="false">Actual tracks</button>
+    </div>
+    <button type="button" class="ghost" id="selChip" hidden title="Back to great circle for all routes"></button>
   </div>
   <div class="msg" id="msg" role="status"></div>
 
@@ -275,6 +285,7 @@ td.a{color:var(--a2g)} td.l{color:var(--leo)} td b{font-weight:600}
 <script src="flat.js"></script>
 <script src="globe.js"></script>
 <script src="covmap.js"></script>
+<script src="routes/files.js"></script>
 <script>
 (function(){
 const D=window.COVDATA,$=id=>document.getElementById(id),pct=v=>Math.round(v)+'%';
@@ -347,7 +358,8 @@ function renderAirline(){
   $('rc').textContent='· '+a.routes.length+(a.uploaded?' uploaded tracks':a.csv?' actual tracks (CSV)':' routes (FlightRadar24)')+' · click a heading to sort';
   const H=[['route','Route'],['km','Km'],['seats','FR24 seats'],['a','A2G plan'],['s','Starlink'],['w','Leader']];
   $('rt').innerHTML='<tr>'+H.map(([k,t])=>`<th data-k="${k}" scope="col">${t}${sortK===k?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>'+rs.map(r=>{const lead=Math.abs(r.a-r.s)<=SKYCOV.TIE?'<span class="pill a" title="Coverage level: A2G has the better upload and latency">A2G · level</span>':r.a>r.s?'<span class="pill a">A2G</span>':'<span class="pill l">Starlink</span>';
-    return `<tr><td>${r.o}–${r.d}</td><td>${r.km.toLocaleString('en-US')}</td><td>${r.seats?r.seats.toLocaleString('en-US'):'–'}</td><td class="a">${r.a}%<span class="mini" style="--c:var(--a2g)"><i style="width:${r.a}%"></i></span></td><td class="l">${r.s}%<span class="mini" style="--c:var(--leo)"><i style="width:${r.s}%"></i></span></td><td>${lead}</td></tr>`;}).join('');
+    return `<tr data-k="${[r.o,r.d].sort().join('-')}" class="${window.SKYSEL===[r.o,r.d].sort().join('-')?'on':''}" style="cursor:pointer" title="Show the actual track of ${r.o}–${r.d} on the map"><td>${r.o}–${r.d}</td><td>${r.km.toLocaleString('en-US')}</td><td>${r.seats?r.seats.toLocaleString('en-US'):'–'}</td><td class="a">${r.a}%<span class="mini" style="--c:var(--a2g)"><i style="width:${r.a}%"></i></span></td><td class="l">${r.s}%<span class="mini" style="--c:var(--leo)"><i style="width:${r.s}%"></i></span></td><td>${lead}</td></tr>`;}).join('');
+  $('rt').querySelectorAll('tr[data-k]').forEach(tr=>tr.onclick=()=>selectRoute(window.SKYSEL===tr.dataset.k?null:tr.dataset.k));
   $('rt').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==='w')return;if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=-1;}renderAirline();});
 }
 function renderCmp(){ $('cmp').innerHTML='<tr><th>Airline</th><th>A2G full plan</th><th>Starlink</th><th>Recommend</th><th>Routes</th><th style="text-align:left">Basis</th></tr>'+sel.map(n=>{const a=D.airlines[n],h=SKYCOV.head(a),d=Math.round(h.a-h.s),rc=SKYCOV.rec(a);
@@ -362,7 +374,7 @@ document.querySelectorAll('.basis-t button').forEach(b=>b.onclick=()=>{ document
 const OFFKEY='skyfive-cov-off', CSKEY='skyfive-cov-csset';
 try{ const o=JSON.parse(localStorage.getItem(OFFKEY)||'[]'); const cs=JSON.parse(localStorage.getItem(CSKEY)||'[]'); SKYCOV.set({off:o.filter(id=>D.units.some(u=>u.id===id)),cs:cs.filter(n=>SKYCOV.csAdded().includes(n)||SKYCOV.CS_NEVER.has(n))}); }catch(e){}
 const CSG=SKYCOV.csGroups(), CSALL=SKYCOV.csAdded(), GLAB={pending_regulatory:'Pending regulatory approval',coming_soon:'Coming soon',unknown:'Status unknown'};
-const closeDD=()=>{ ['ctyPan','csPan'].forEach(id=>$(id).hidden=true); $('ctyBtn').setAttribute('aria-expanded',false); $('cs').setAttribute('aria-expanded',false); };
+const closeDD=()=>{ ['ctyPan','csPan','libPan'].forEach(id=>{ if($(id)) $(id).hidden=true; }); $('ctyBtn').setAttribute('aria-expanded',false); $('cs').setAttribute('aria-expanded',false); };
 function ctyRender(){ const st=SKYCOV.state(), off=new Set(st.off), n=D.units.length-off.size, cs=new Set(st.cs);
   $('ctyN').textContent=n+'/'+D.units.length; $('ctyBtn').classList.toggle('off',off.size>0);
   $('csN').textContent=cs.size?cs.size+(cs.has('Saudi Arabia')?' incl. KSA':''):''; $('cs').setAttribute('aria-pressed',cs.size>0);
@@ -429,6 +441,10 @@ const ORIG={}; const upKey=n=>'skyfive-cov-upload3-'+n;
 function applyUpload(n,obj){ if(!ORIG[n]) ORIG[n]=SKYCOV.getRaw(n); SKYCOV.setRaw(n,obj); }
 // restore uploads saved in this browser
 Object.keys(D.airlines).forEach(n=>{ try{ const s=localStorage.getItem(upKey(n)); if(s){ const o=JSON.parse(s); if(!o.routes||!o.__cn) return; Object.assign(D.airports,o.__ap||{}); o.routes.forEach(r=>r.pts.forEach(p=>{p[2]=ciOf(o.__cn[p[2]]);})); delete o.__ap; delete o.__cn; applyUpload(n,o); } }catch(e){} });
+async function handleText(txt,fname,n){ try{ const obj=parseTracks(txt,ORIG[n]||SKYCOV.getRaw(n),fname); obj.uploaded.file=fname; applyUpload(n,obj);
+    try{ const ap={}; obj.routes.forEach(r=>[r.o,r.d].forEach(c=>ap[c]=D.airports[c])); localStorage.setItem(upKey(n),JSON.stringify({...obj,__ap:ap,__cn:D.cnames.map(c=>c.n)})); }catch(e){}
+    $('msg').textContent=`${n}: loaded ${obj.uploaded.flights} flights on ${obj.routes.length} routes from ${fname}. A2G ${Math.round(D.airlines[n].net.a)}% vs Starlink ${Math.round(D.airlines[n].net.s)}%.`; renderAll(); }
+  catch(e){ $('msg').textContent='Could not read '+fname+': '+e.message; } }
 async function handleFile(f){ if(!f) return; const n=active; $('msg').textContent='Reading '+f.name+'…'; await new Promise(r=>setTimeout(r,20));
   try{ const buf=await f.arrayBuffer(); let txt=new TextDecoder('utf-8').decode(buf); if(txt.includes('\ufffd')) txt=new TextDecoder('windows-1252').decode(buf);
     const obj=parseTracks(txt,ORIG[n]||SKYCOV.getRaw(n),f.name); obj.uploaded.file=f.name; applyUpload(n,obj);
@@ -445,6 +461,32 @@ $('revert').onclick=()=>{ const n=active; removeUpload(n); $('msg').textContent=
 function srcUI(){ const n=active, b=BASE[n]||SKYCOV.getRaw(n), has=!!(b&&b.alt&&b.alt.csv); $('srcT').hidden=!has; if(!has) return;
   const cur=SRC[n]||SRC_DEF(n); $('srcT').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.src===cur&&!D.airlines[n].uploaded)); }
 $('srcT').querySelectorAll('button').forEach(x=>x.onclick=()=>{ const n=active; removeUpload(n); applySrc(n,x.dataset.src,true); $('msg').textContent=n+': using '+(x.dataset.src==='csv'?'the CSV actual tracks ('+D.airlines[n].routes.length+' routes)':'FlightRadar24 routes ('+D.airlines[n].routes.length+' routes)')+'.'; renderAll(); });
+// ---------- route shape: great circle by default; click a route in the table to see its actual track
+try{ window.SKYSHAPE=localStorage.getItem('skyfive-shape')||'gc'; }catch(e){ window.SKYSHAPE='gc'; }
+window.SKYSEL=null;
+function shapeUI(){ $('shapeT').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===window.SKYSHAPE));
+  const s=window.SKYSEL; $('selChip').hidden=!s; if(s) $('selChip').textContent='Actual track: '+s.replace('-','–')+'  ✕ back to great circle'; }
+function selectRoute(k){ window.SKYSEL=k; shapeUI(); renderAirline(); drawGlobe(); if(k) document.querySelector('.hero').scrollIntoView({behavior:'smooth',block:'start'}); }
+$('shapeT').querySelectorAll('button').forEach(b=>b.onclick=()=>{ window.SKYSHAPE=b.dataset.s; try{localStorage.setItem('skyfive-shape',b.dataset.s)}catch(e){} window.SKYSEL=null; shapeUI(); renderAirline(); drawGlobe(); });
+$('selChip').onclick=()=>{ window.SKYSHAPE='gc'; try{localStorage.setItem('skyfive-shape','gc')}catch(e){} selectRoute(null); };
+// ---------- saved route files: always the latest versions, loaded on demand
+const LIB=window.ROUTEFILES||[];
+function libRender(){ $('libPan').innerHTML='<h4>Saved route files · updated daily</h4>'+(LIB.length?LIB.map((f,i)=>`<button type="button" class="libi" data-i="${i}"><b>${f.label}</b><small>${f.note||''}</small></button>`).join(''):'<p class="basis">No saved files yet.</p>')+
+  '<p class="basis" style="margin:10px 0 0">Loads the file for its airline (it becomes the active airline). New airlines are added to the list. “✕ Remove uploaded CSV” goes back to the built-in routes.</p>';
+  $('libPan').querySelectorAll('.libi').forEach(b=>b.onclick=()=>loadLib(LIB[+b.dataset.i])); }
+function ensureAirline(f){ if(SKYCOV.getRaw(f.airline)) return; SKYCOV.setRaw(f.airline,{name:f.airline,iata:f.iata||'',icao:f.icao||'',cc:f.cc||'Other',hub:f.hub,hubs:f.hubs||[f.hub],fleet:null,flights:null,markets:null,calcs:null,routes:[]});
+  if(!D.order.includes(f.airline)) D.order.push(f.airline); (byCountry[f.cc||'Other']=byCountry[f.cc||'Other']||[]).push(f.airline); }
+async function loadLib(f){ closeDD(); $('msg').textContent='Loading '+f.label+'…';
+  try{ ensureAirline(f); if(!sel.includes(f.airline)){ sel.push(f.airline); persist(); } active=f.airline;
+    const r=await fetch(f.file); if(!r.ok) throw new Error('file not found ('+r.status+')'); const buf=await r.arrayBuffer();
+    let txt=new TextDecoder('utf-8').decode(buf); if(txt.includes('\ufffd')) txt=new TextDecoder('windows-1252').decode(buf);
+    await handleText(txt,f.file.split('/').pop(),f.airline); }
+  catch(e){ $('msg').textContent='Could not load '+f.label+': '+e.message; } }
+$('libBtn').onclick=e=>{ e.stopPropagation(); const open=$('libPan').hidden; closeDD(); $('libPan').hidden=!open; $('libBtn').setAttribute('aria-expanded',open); };
+$('libPan').addEventListener('click',e=>e.stopPropagation());
+libRender(); shapeUI();
+SKYCOV.set({}); // recompute so every route also has its great-circle twin
+setLayer('split');
 renderAll();
 // PPT export
 // Export button stays visible; save() waits for the viewer and explains if downloads are blocked here.

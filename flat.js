@@ -22,8 +22,13 @@ function draw(cv,names,o){ o=o||{}; const L=o.layer||'both', SA=L!=='leo', SS=L!
   c.beginPath(); for(const f of FS) path(f); c.strokeStyle='rgba(110,150,220,.45)'; c.lineWidth=Math.max(1,W/2400); c.stroke();
   if(SA) for(const f of FS){ if(!info(f.properties.name).plan) continue; c.beginPath(); path(f); c.strokeStyle=info(f.properties.name).planFut?'rgba(170,235,255,.4)':'rgba(150,240,255,.85)'; c.lineWidth=Math.max(1,W/1600); c.stroke(); }
   const lw=Math.max(1.1,W/1150); c.lineCap='round'; const seen=new Set(); routes=routes.filter(r=>{const k=[r.o,r.d].sort().join('-'); if(seen.has(k)) return false; seen.add(k); return true;});
-  for(const r of routes){ const P=r.pts; for(let i=0;i<P.length-1;i++){ const k=cls(P[i][2],P[i+1][2],L); c.beginPath(); path({type:'LineString',coordinates:[[P[i][0],P[i][1]],[P[i+1][0],P[i+1][1]]]});
-      c.strokeStyle=HEX[k]; c.globalAlpha=k==='none'?.75:.9; c.lineWidth=lw; if(k==='none') c.setLineDash([lw*1.6,lw*2.4]); c.stroke(); c.setLineDash([]); c.globalAlpha=1; } }
+  const sel=window.SKYSEL||null, gcOn=(window.SKYSHAPE||'gc')==='gc';
+  const drawRun=(P,i,j,k,dim,hi)=>{ c.beginPath(); path({type:'LineString',coordinates:P.slice(i,j+1).map(p=>[p[0],p[1]])});
+    c.strokeStyle=HEX[k]; c.globalAlpha=dim?.18:(k==='none'?.7:.92); c.lineWidth=hi?lw*2.2:lw; if(k==='none') c.setLineDash([lw*1.6,lw*2.4]);
+    if(hi&&k!=='none'){ c.shadowColor=HEX[k]; c.shadowBlur=lw*6; } c.stroke(); c.shadowBlur=0; c.setLineDash([]); c.globalAlpha=1; };
+  const order=routes.map(r=>{ const key=[r.o,r.d].sort().join('-'); return {r,hi:sel===key}; }).sort((x,y)=>x.hi-y.hi);
+  for(const {r,hi} of order){ const P=hi||!gcOn||!r.gc||r.gc.length<2?r.pts:r.gc, dim=!!sel&&!hi; let i=0;
+    while(i<P.length-1){ const k=cls(P[i][2],P[i+1][2],L); let j=i+1; while(j<P.length-1&&cls(P[j][2],P[j+1][2],L)===k) j++; drawRun(P,i,j,k,dim,hi); i=j; } }
   const codes=new Set(); routes.forEach(r=>{codes.add(r.o);codes.add(r.d);}); const fs=Math.round(W/90);
   c.textBaseline='middle';
   const deg={}; routes.forEach(r=>{deg[r.o]=(deg[r.o]||0)+1;deg[r.d]=(deg[r.d]||0)+1;}); const taken=[];

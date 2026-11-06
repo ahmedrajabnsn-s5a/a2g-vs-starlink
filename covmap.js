@@ -23,6 +23,13 @@ function evalPts(P){ let T=0,A=0,S=0; const ga={},gs={}; const fl=P.map(p=>[p[0]
     if(ca) A+=L; else { const c=D.cnames[!(fl[i][2]&1)?P[i][2]:P[i+1][2]].n; ga[c]=(ga[c]||0)+L; }
     if(cs) S+=L; else { const c=D.cnames[!(fl[i][2]&2)?P[i][2]:P[i+1][2]].n; gs[c]=(gs[c]||0)+L; } }
   return {T,a:T?A/T:0,s:T?S/T:0,ga,gs,fl}; }
+const GCC=new WeakMap();
+function gcRaw(x){ if(GCC.has(x)) return GCC.get(x); const A=D.airports[x.o],B=D.airports[x.d], P=x.pts; let out=null;
+  if(A&&B&&P&&P.length>1&&window.d3){ let Q=P; if(hav(Q[0],[A.lon,A.lat])>hav(Q[Q.length-1],[A.lon,A.lat])) Q=Q.slice().reverse();
+    const cum=[0]; for(let i=1;i<Q.length;i++) cum.push(cum[i-1]+hav(Q[i-1],Q[i])); const TT=cum[cum.length-1]||1;
+    const a=[A.lon,A.lat],b=[B.lon,B.lat],L=hav(a,b),n=Math.max(2,Math.ceil(L/30)),ip=d3.geoInterpolate(a,b); out=[]; let j=0;
+    for(let k=0;k<=n;k++){ const p=ip(k/n), t=k/n*TT; while(j<Q.length-1&&cum[j+1]<t) j++; const q=Q[Math.min(j+(t-cum[j]>(cum[j+1]-cum[j])/2?1:0),Q.length-1)]; out.push([p[0],p[1],q[2],q[3]]); } }
+  GCC.set(x,out); return out; }
 function build(r){ const ev=r.routes.map(x=>evalPts(x.pts)); let W=0,A=0,S=0; const GA={},GS={};
   ev.forEach((e,i)=>{ const w=(r.routes[i].km||e.T)*(r.routes[i].flights||1); W+=w; A+=w*e.a; S+=w*e.s;
     const k=w/(e.T||1); for(const c in e.ga) GA[c]=(GA[c]||0)+e.ga[c]*k; for(const c in e.gs) GS[c]=(GS[c]||0)+e.gs[c]*k; });
@@ -33,7 +40,7 @@ function build(r){ const ev=r.routes.map(x=>evalPts(x.pts)); let W=0,A=0,S=0; co
     const Sh=markets.reduce((t,m)=>t+m.share,0)||1; tw={a:markets.reduce((t,m)=>t+m.share*m.a,0)/Sh,s:markets.reduce((t,m)=>t+m.share*m.s,0)/Sh,flights:r.flights}; }
   return {name:r.name,iata:r.iata,icao:r.icao,cc:r.cc,hub:r.hub,hubs:r.hubs,fleet:r.fleet,uploaded:r.uploaded||null,csv:r.routes.some(x=>x.src==='csv'),
     net:{a:A/W*100,s:S/W*100,routes:r.routes.length},tw,markets,gapsA:top(GA),gapsS:top(GS),
-    routes:r.routes.map((x,i)=>({o:x.o,d:x.d,km:x.km,src:x.src,seats:x.seats||null,flights:x.flights||null,a:Math.round(ev[i].a*100),s:Math.round(ev[i].s*100),pts:ev[i].fl}))}; }
+    routes:r.routes.map((x,i)=>({o:x.o,d:x.d,km:x.km,src:x.src,seats:x.seats||null,flights:x.flights||null,a:Math.round(ev[i].a*100),s:Math.round(ev[i].s*100),pts:ev[i].fl,gc:(g=>g?evalPts(g).fl:null)(gcRaw(x))}))}; }
 function recompute(){ window.SKYMODE=ST.mode; ACT=activeMask(); OKC=D.cnames.map(c=>slOk(c.n,c.st));
   const C={}; for(const n in RAWC){ const c=RAWC[n]; const pl=c.unit>=0&&(ACT&(1<<c.unit))?1:0; C[n]={sl:slOk(n,c.st)?'available':'no',plan:pl,planFut:pl&&D.units[c.unit].tier!==0?1:0,slFut:(!SLOK.has(c.st)&&slOk(n,c.st))?1:0}; } D.countries=C;
   for(const n in RAWA) D.airlines[n]=build(RAWA[n]);
@@ -126,10 +133,9 @@ function methodSlide(p,extra){ const s=p.addSlide({masterName:'LIGHT'}); title(s
     'Starlink: a stretch is covered when it is over a country marked Available on starlink.com/map (feed read 3 Nov 2026) or over open sea. Pending regulatory, coming soon and unknown count as not covered. This is Starlink’s best case: airlines also need each overflown state’s authorisation.',
     'Routes: Oman Air uses the attached FR24 track file (44 actual flights from Muscat; the COK track ended at Hyderabad and was left out). Other airlines use the routes in the SKYFive A2G Coverage Globe. Traffic weights come from its FR24 sample, 21 Sep – 6 Oct 2026.'].concat(note()).concat(extra||[]);
   s.addText(items.map((t,i)=>({text:t,options:{bullet:true,breakLine:i<items.length-1}})),{x:0.6,y:1.4,w:12.1,h:5.3,fontSize:15,color:P.ink,margin:0,valign:'top',paraSpaceAfter:12}); return s; }
-async function getDL(){ for(let i=0;i<8&&!(window.claude&&window.claude.use);i++) await new Promise(r=>setTimeout(r,250));
+async function getDL(){ for(let i=0;i<40&&!(window.claude&&window.claude.use);i++) await new Promise(r=>setTimeout(r,250));
   try{ return window.claude&&window.claude.use ? await window.claude.use('downloads') : null; }catch(e){ return null; } }
-async function save(p,filename){ if(!window.claude){ await p.writeFile({fileName:filename}); return {status:'saved'}; }
-  const dl=await getDL();
+async function save(p,filename){ const dl=await getDL();
   if(!dl) throw {code:'unavailable',message:'this view blocks downloads. Open the page full screen (the expand icon at the top right of the artifact, or open it from your Artifacts list) and press Export PPT again.'};
   const blob=await p.write({outputType:'blob'}); return dl.save({filename,data:blob}); }
 // ---------- Export PPT chooser: flat map or 3D globe for the map images (both pages)

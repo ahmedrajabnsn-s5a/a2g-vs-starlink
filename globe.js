@@ -10,6 +10,10 @@ let FEATS=null;
 function feats(){ if(FEATS) return FEATS; const t=window.__J['countries-50m.json']; FEATS=topojson.feature(t,t.objects.countries).features; return FEATS; }
 function ll2v(lon,lat,r){ r=r||R; const phi=(lon+180)/360*Math.PI*2, la=lat*Math.PI/180;
   return new THREE.Vector3(-Math.cos(phi)*Math.cos(la)*r, Math.sin(la)*r, Math.sin(phi)*Math.cos(la)*r); }
+// which points to draw for a route: great-circle arc by default, the actual track for the selected route (or in track mode)
+function RP(r){ const key=[r.o,r.d].sort().join('-'), sel=window.SKYSEL||null;
+  if(sel&&key===sel) return {P:r.pts,hi:1,dim:0};
+  const useGC=(window.SKYSHAPE||'gc')==='gc'&&r.gc&&r.gc.length>1; return {P:useGC?r.gc:r.pts,hi:0,dim:sel?1:0}; }
 function cls(f1,f2,L){const A=(f1&1)&&(f2&1),S=(f1&2)&&(f2&2); if(L==='a2g') return A?'a2g':'none'; if(L==='leo') return S?'leo':'none'; return A&&S?'both':A?'a2g':S?'leo':'none';}
 const OKS=new Set(['launched','available']);
 function texture(w,L){ L=L||'both'; const SHOW_A=L!=='leo', SHOW_S=L!=='a2g';
@@ -59,34 +63,34 @@ function create(canvas,opt){
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.012,96,72),holo));
   { const n=2200,p=new Float32Array(n*3); for(let i=0;i<n;i++){ const v=new THREE.Vector3().randomDirection().multiplyScalar(1400+Math.random()*1200); p.set([v.x,v.y,v.z],i*3);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xbfffe6,size:1.5,sizeAttenuation:false,transparent:true,opacity:.5}))); }
   const composer=new THREE.EffectComposer(renderer); composer.addPass(new THREE.RenderPass(scene,camera));
-  const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(W(),H()),.22,.4,.8); composer.addPass(bloom);
+  const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(W(),H()),.32,.35,.72); composer.addPass(bloom);
   composer.setSize(W(),H());
-  const routes=new THREE.Group(); globe.add(routes); let mats=[], comet=null, cometData=[], apList=[];
-  function clear(){ for(const o of routes.children.slice()){ routes.remove(o); o.geometry.dispose(); o.material.dispose(); } mats=[]; comet=null; cometData=[]; apList=[]; }
-  function mat(width,color,opacity,dashed){ const m=new THREE.LineMaterial({color:new THREE.Color(`rgb(${color.join(',')})`),linewidth:width,transparent:true,opacity,depthWrite:false,dashed:!!dashed,dashSize:.9,gapSize:1.3});
+  const routes=new THREE.Group(); globe.add(routes); let mats=[], flows=[], comet=null, cometData=[], apList=[];
+  function clear(){ for(const o of routes.children.slice()){ routes.remove(o); o.geometry.dispose(); o.material.dispose(); } mats=[]; flows=[]; comet=null; cometData=[]; apList=[]; }
+  function mat(width,color,opacity,dashed,ds,gs,add){ const m=new THREE.LineMaterial({color:new THREE.Color(`rgb(${color.join(',')})`),linewidth:width,transparent:true,opacity,depthWrite:false,dashed:!!dashed,dashSize:ds||.9,gapSize:gs||1.3}); if(add) m.blending=THREE.AdditiveBlending;
     if(dashed) m.defines.USE_DASH=''; m.resolution.set(W(),H()); mats.push(m); return m; }
   let lastNames=[];
   function setLayer(L){ layer=L||'both'; const t=tex(layer); backM.map=t; frontM.map=t; backM.needsUpdate=frontM.needsUpdate=true; show(lastNames); }
   function show(names){
     lastNames=names; clear(); const ap=new Map(), hubs=new Set(), seen=new Set(), deg=new Map();
     for(const n of names){ const a=CD.airlines[n]; if(!a) continue; a.hubs.forEach(h=>hubs.add(h));
-      for(const r of a.routes){ const key=[r.o,r.d].sort().join('-'); [r.o,r.d].forEach(c=>deg.set(c,(deg.get(c)||0)+1)); if(seen.has(key)) continue; seen.add(key); const P=r.pts, nP=P.length; const h=Math.min(12,1.2+r.km/700); const vs=P.map((p,i)=>ll2v(p[0],p[1],R+0.5+h*Math.sin(Math.PI*i/(nP-1))));
-        // runs of the same class
+      for(const r of a.routes){ const key=[r.o,r.d].sort().join('-'); [r.o,r.d].forEach(c=>deg.set(c,(deg.get(c)||0)+1)); if(seen.has(key)) continue; seen.add(key);
+        const rp=RP(r), P=rp.P, nP=P.length; if(nP<2) continue; const h=Math.min(9,0.8+r.km/850); const vs=P.map((p,i)=>ll2v(p[0],p[1],R+0.45+h*Math.sin(Math.PI*i/(nP-1))));
+        // one line per run of the same coverage class: a fine core plus a travelling light pulse
         let i=0; while(i<nP-1){ const k=cls(P[i][2],P[i+1][2],layer); let j=i+1; while(j<nP-1&&cls(P[j][2],P[j+1][2],layer)===k) j++;
           const pos=[]; for(let q=i;q<=j;q++) pos.push(vs[q].x,vs[q].y,vs[q].z);
-          const g=new THREE.LineGeometry(); g.setPositions(pos);
-          const halo=new THREE.Line2(g,mat(k==='none'?2.5:4,COL[k],k==='none'?.05:.1)); halo.computeLineDistances(); routes.add(halo);
-          const g2=new THREE.LineGeometry(); g2.setPositions(pos);
-          const line=new THREE.Line2(g2,mat(k==='none'?1.2:1.8,COL[k],k==='none'?.7:.92,k==='none')); line.computeLineDistances(); routes.add(line);
+          const op=rp.dim?.16:(k==='none'?.55:.78), w=rp.hi?2.6:(k==='none'?1:1.25);
+          const g=new THREE.LineGeometry(); g.setPositions(pos); const line=new THREE.Line2(g,mat(w,COL[k],op,k==='none',.7,1.1)); line.computeLineDistances(); routes.add(line);
+          if(rp.hi){ const g0=new THREE.LineGeometry(); g0.setPositions(pos); const glow=new THREE.Line2(g0,mat(7,COL[k],.18,false,0,0,true)); routes.add(glow); }
+          if(!rp.dim&&k!=='none'){ const g2=new THREE.LineGeometry(); g2.setPositions(pos); const m2=mat(rp.hi?3.2:2.1,k==='both'?[255,255,255]:COL[k].map(c=>Math.min(255,c+60)),.95,true,1.4,9+Math.random()*6,true); m2.dashOffset=-Math.random()*20; const fl=new THREE.Line2(g2,m2); fl.computeLineDistances(); routes.add(fl); flows.push({m:m2,sp:3+Math.min(6,r.km/1200)}); }
           i=j; }
-        cometData.push({vs,ph:Math.random(),sp:.04+.25/Math.max(1,r.km/1000)});
         [r.o,r.d].forEach(c=>{ const p=CD.airports[c]; if(p) ap.set(c,p); }); } }
     const mk=(list,lift)=>{ const a=new Float32Array(list.length*3); list.forEach((c,i)=>{ const p=ap.get(c), v=ll2v(p.lon,p.lat,R+lift); a.set([v.x,v.y,v.z],i*3); }); const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(a,3)); return g; };
     const codes=[...ap.keys()]; apList=codes.map(c=>({c,hub:hubs.has(c),p:ap.get(c),w:(hubs.has(c)?1e6:0)+(deg.get(c)||0)})).sort((x,y)=>y.w-x.w);
     routes.add(new THREE.Points(mk(codes.filter(c=>!hubs.has(c)),.6),new THREE.PointsMaterial({color:0xe9f6ff,size:3.5,sizeAttenuation:false,transparent:true,depthWrite:false})));
     routes.add(new THREE.Points(mk(codes.filter(c=>hubs.has(c)),.7),new THREE.PointsMaterial({color:0xffffff,size:8,sizeAttenuation:false,transparent:true,depthWrite:false})));
     const cg=new THREE.BufferGeometry(); cg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(cometData.length*3),3));
-    comet=new THREE.Points(cg,new THREE.PointsMaterial({color:0xffffff,size:3,sizeAttenuation:false,transparent:true,depthWrite:false})); routes.add(comet);
+    comet=null;
   }
   // camera framing for a set of airlines
   function frame(names){
@@ -107,7 +111,8 @@ function create(canvas,opt){
   function step(now,dt){ holo.uniforms.uT.value=now/1000;
     if(flight){ const k=Math.min(1,(now-flight.t0)/1300), e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2; const a=flight.from.clone().normalize(), b=flight.to.clone().normalize();
       const d=flight.from.length()+(flight.to.length()-flight.from.length())*e; const dir=a.lerp(b,e).normalize(); camera.position.copy(dir.multiplyScalar(d)); camera.lookAt(0,0,0); if(k>=1) flight=null; }
-    if(comet){ const pos=comet.geometry.attributes.position; cometData.forEach((o,i)=>{ o.ph=(((o.ph+dt*o.sp)%1)+1)%1; const f=o.ph*(o.vs.length-1), j=Math.floor(f), t=f-j, a=o.vs[j], b=o.vs[Math.min(j+1,o.vs.length-1)]; pos.setXYZ(i,a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t); }); pos.needsUpdate=true; }
+    for(const f of flows) f.m.dashOffset-=dt*f.sp;
+    if(comet&&false){ const pos=comet.geometry.attributes.position; cometData.forEach((o,i)=>{ o.ph=(((o.ph+dt*o.sp)%1)+1)%1; const f=o.ph*(o.vs.length-1), j=Math.floor(f), t=f-j, a=o.vs[j], b=o.vs[Math.min(j+1,o.vs.length-1)]; pos.setXYZ(i,a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t); }); pos.needsUpdate=true; }
     if(controls) controls.update(); composer.render(); }
   function loop(now){ const dt=Math.max(0,Math.min(.05,(now-last)/1000)); last=now; step(now,dt); if(opt.onFrame) opt.onFrame(); raf=requestAnimationFrame(loop); }
   if(run) raf=requestAnimationFrame(loop);
